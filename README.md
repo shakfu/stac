@@ -65,7 +65,7 @@ build/stac [-p prelude] ... [-i] [file]
 | `STAC_OUTPUTS`, `STAC_INPUTS` | its channels | 2, 0 |
 | `STAC_SR` | its sample rate | the device's |
 | `STAC_PLUGINS` | its UGen plugin folder | `plugins/` beside the executable |
-| `STAC_LOG`, `STAC_HISTORY` | REPL log and history files | `~/stac-log.txt`, `~/stac-history.txt` |
+| `STAC_LOG`, `STAC_HISTORY` | REPL log and history files | none: no log, history in memory only |
 | `STAC_COLORS` | REPL colours, as `kind=SGR` pairs separated by `:`, e.g. `number=36:library=1;94`. Kinds: `comment string symbol number keyword operator bracket delimiter definition parameter type variable module property method library ugen bound unbound` | the terminal's 16 colours |
 
 Inputs default to 0: with an input stream, scsynth can hang at boot while another program holds the capture device.

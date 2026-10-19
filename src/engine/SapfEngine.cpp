@@ -95,13 +95,9 @@ void SapfEngine::configureLogFile()
 	if (vm.log_file) {
 		return;
 	}
-	vm.log_file = stacEnv("LOG");
-	if (!vm.log_file) {
-		const char* home_dir = getenv("HOME");
-		static char logfilename[PATH_MAX];
-		snprintf(logfilename, PATH_MAX, "%s/stac-log.txt", home_dir);
-		vm.log_file = logfilename;
-	}
+	// No log unless STAC_LOG names a file
+	const char* env = stacEnv("LOG");
+	if (env && *env) vm.log_file = env;
 }
 
 

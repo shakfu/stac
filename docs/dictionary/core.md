@@ -992,7 +992,7 @@ Use it to browse sapf's examples.
 
 Opens the log file in the default text editor.
 
-Use it to review what a session evaluated; `$STAC_LOG` sets the file.
+Use it to review what a session evaluated; `$STAC_LOG` sets the file. Without it there is no log.
 
 ### readme
 

@@ -54,3 +54,19 @@ def repl(sapf_bin, tmp_path):
 ])
 def test_completion_and_hints(repl, keys, shown):
     assert shown in repl(keys)
+
+
+def test_no_files_by_default(sapf_bin, tmp_path):
+    env = {k: v for k, v in os.environ.items() if k not in ("STAC_HISTORY", "STAC_LOG")}
+    env.update(STAC_PRELUDE=os.devnull, HOME=str(tmp_path))
+    out = subprocess.run([str(SAPF), "-q"], input="1 2 +\nquit\n", capture_output=True, text=True,
+                         env=env, cwd=tmp_path, timeout=30).stdout
+    assert "good bye" in out
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_files_when_named(sapf_bin, tmp_path):
+    env = dict(os.environ, STAC_PRELUDE=os.devnull, STAC_HISTORY=str(tmp_path / "h"), STAC_LOG=str(tmp_path / "l"))
+    subprocess.run([str(SAPF), "-q"], input="1 2 +\nquit\n", capture_output=True, text=True, env=env, timeout=30)
+    assert "1 2 +" in (tmp_path / "h").read_text()
+    assert "1 2 +" in (tmp_path / "l").read_text()

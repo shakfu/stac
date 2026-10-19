@@ -438,13 +438,14 @@ void Thread::getLine()
 	size_t origLen = strlen(input);
 	if (origLen > 0) {
 		replxx_history_add(replxx, input);
-		replxx_history_save(replxx, historyfilename);
+		if (historyfilename[0]) replxx_history_save(replxx, historyfilename);
 		if (logfilename) {
-			FILE* logfile = fopen(logfilename, "a");
-			logTimestamp(logfile);
-			fwrite(input, 1, origLen, logfile);
-			fputc('\n', logfile);
-			fclose(logfile);
+			if (FILE* logfile = fopen(logfilename, "a")) {
+				logTimestamp(logfile);
+				fwrite(input, 1, origLen, logfile);
+				fputc('\n', logfile);
+				fclose(logfile);
+			}
 		}
 	}
 
@@ -531,23 +532,9 @@ void Thread::repl(FILE* infile, const char* inLogfilename)
 	// Initialize replxx
 	replxx = replxx_init();
 
-	// Set up history file path; legacyHistory is the pre-rename default, read once if the new file is absent
-	char legacyHistory[PATH_MAX] = "";
+	// History stays in memory unless STAC_HISTORY names a file
 	const char* envHistoryFileName = stacEnv("HISTORY");
-	if (envHistoryFileName) {
-		snprintf(historyfilename, PATH_MAX, "%s", envHistoryFileName);
-	} else {
-		const char* homeDir = getenv("HOME");
-#ifdef _WIN32
-		if (!homeDir) homeDir = getenv("USERPROFILE");
-#endif
-		if (homeDir) {
-			snprintf(historyfilename, PATH_MAX, "%s/stac-history.txt", homeDir);
-			snprintf(legacyHistory, PATH_MAX, "%s/sapf-history.txt", homeDir);
-		} else {
-			snprintf(historyfilename, PATH_MAX, "stac-history.txt");
-		}
-	}
+	snprintf(historyfilename, PATH_MAX, "%s", envHistoryFileName ? envHistoryFileName : "");
 
 	// Configure replxx
 	replxx_set_max_history_size(replxx, 800);
@@ -558,8 +545,7 @@ void Thread::repl(FILE* infile, const char* inLogfilename)
 	const char* noColor = getenv("NO_COLOR");  // no-color.org: set and not empty
 	if (!noColor || !*noColor) replxx_set_highlighter_callback(replxx, highlighterCallback, this);
 #endif
-	if (replxx_history_load(replxx, historyfilename) != 0 && legacyHistory[0])
-		replxx_history_load(replxx, legacyHistory);
+	if (historyfilename[0]) replxx_history_load(replxx, historyfilename);
 #endif
 
 	fflush(infile);
@@ -621,7 +607,7 @@ void Thread::repl(FILE* infile, const char* inLogfilename)
 
 #if USE_REPLXX
 	// Save history and clean up
-	replxx_history_save(replxx, historyfilename);
+	if (historyfilename[0]) replxx_history_save(replxx, historyfilename);
 	if (currentLine) {
 		free(currentLine);  // We use malloc to add newline
 		currentLine = nullptr;
