@@ -87,6 +87,7 @@
 
 ### Fixed
 
+- `play` refuses a channel that is a constant outside -1..1: `[440 0 sinosc .1 *] play` under `prelude.stac` sent DC 440 to channel 0, which the DAC clips to full-scale DC. An error over clipping, which keeps the DC, or a warning, which still plays it. Constants within -1..1 still play, as CV on DC-coupled outputs such as the SSP's.
 - A UGen with no outputs, such as `out`, `localout` or `sendtrig`, in a plain `[...] play` list was dropped from the graph; only a `synthdef` body kept it. Such a UGen now returns a `Root`, printed `<LocalOut>`, which `play`, `>sd`, `>sf` and `ndef` make a root of the graph. A `Root` is not a signal, so arithmetic on it fails; `pop` still drops it. The value carries the root, over a collector per REPL line, which would lose a root bound on one line and played on the next. A `synthdef` body that leaves only Roots no longer gets an `out` control.
 - `"a""b"` failed to parse: a doubled quote ended the string after adding the quote. It is now the string `a"b`. Upstream sapf has the same bug ([docs/dev/upstream-sapf-bugs.md](docs/dev/upstream-sapf-bugs.md)).
 - Workspace and built-in lookups matched a name by its 32-bit hash alone, so two names with the same hash read each other's bindings. They now compare the name too.

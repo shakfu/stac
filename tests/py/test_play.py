@@ -83,6 +83,20 @@ def test_play_reports_a_missing_server(tmp_path, monkeypatch):
     assert "no reply" in out and "error" in out, out
 
 
+@pytest.mark.parametrize("code", ["440 play", "[0 0 sinosc 440] play", "-1.5 play"])
+def test_play_refuses_a_constant_outside_full_scale(tmp_path, monkeypatch, code):
+    monkeypatch.setenv("STAC_SCSYNTH", "127.0.0.1:57199")
+    out = run_sapf(code, tmp_path)
+    assert "sends DC to the output" in out and "no reply" not in out, out
+
+
+@pytest.mark.parametrize("code", ["1 play", "[0 0 sinosc -.5] play"])
+def test_play_sends_a_constant_cv_within_full_scale(tmp_path, monkeypatch, code):
+    monkeypatch.setenv("STAC_SCSYNTH", "127.0.0.1:57199")
+    out = run_sapf(code, tmp_path)
+    assert "sends DC" not in out and "no reply" in out, out
+
+
 def test_ola_voices_start_and_stop(server, sapf, tmp_path):
     # -i keeps sapf running after the file, so its scheduler keeps starting voices.
     src = tmp_path / "ola.sapf"

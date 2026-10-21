@@ -18,6 +18,8 @@ State as of 2026-10-14, on the Linux machine, ../ssp branch `sapf` (`c1290dd`).
 
 - `>nrt` writes a score when values are left on the stack, without a warning. A typo dropped `osc` from a test score this way.
 
+- Sample scaling: 1.0 is +5 V, so -1..1 spans the outputs' -5..+5 V. Percussa's SDK does not state it; TheTechnobear's DATA plugin displays volts as sample x 5 (`technobear/data/Source/PluginEditor.cpp:226`) and reads 1 V/oct as 0.2 per octave (`technobear/common/SSP.h:37`), in github.com/TheTechnobear/SSP `20ea8c5`. `play`'s DC check uses this bound.
+
 ## Tasks
 
 1. A `sapf` SSP plugin for live coding: the interpreter with its own `ScWorld`, ttyp's keyboard input, a multi-line editor, the prelude loaded at start. Design: ../ssp docs/dev/sapf-plugin.md. Step 1 (the interpreter on the SSP) passed 2026-10-14. Its sapf-sc changes: `SAPF_REPLXX` (CMake option, default ON), and `Array::setSize`/`addSize` taking `int64_t`: as `size_t`, `Gen::produce`'s negative delta became 2^32 - k on 32-bit ARM and crashed every list operation. Steps 2 and 4 still need `ScsynthServer::now()`, a `post` hook and an interrupt flag.

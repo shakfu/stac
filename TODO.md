@@ -2,10 +2,6 @@
 
 In order of priority within each section. Design records are in docs/dev/; this file lists work only.
 
-## Critical
-
-- [ ] Rerun `make test` on Linux. It last passed on 2026-10-14, before phase 5; since then the parser, the VM's binding and lookup, modules and the namespaces have changed.
-
 ## Medium
 
 ### Language
@@ -31,8 +27,6 @@ In order of priority within each section. Design records are in docs/dev/; this 
 - [ ] `ndef` at control rate: a control-rate source should take a control bus and no monitor, as SC's.
 
 - [ ] `ndef` keeps its bus for the session. SC's `clear` frees it; add `.clear`.
-
-- [ ] `play` sends a constant channel to the speakers unchecked: `[440 0 sinosc .1 *] play` under `prelude.stac` outputs DC 440 on channel 0. Warn when a channel is a constant outside -1..1.
 
 - [ ] `>sd` and `.write`: write the SSP `scsy` sidecar's `@p` lines alongside `name.scsyndef`.
   - Format, from `../ssp/plugins/scsynth/README.md`: `name.txt` beside `name.scsyndef`, lines `// @p1 cutoff 20 20000 Hz log cv 3` (slot, control name, min, max, unit, curve, CV input).

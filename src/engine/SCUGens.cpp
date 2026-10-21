@@ -1017,6 +1017,16 @@ static void play_(Thread& th, Prim* prim)
 		playEventStream(th, channels);
 		return;
 	}
+	// a constant past full scale is DC, almost always a stack mistake; on the SSP, 1.0 is +5 V
+	std::vector<V> chans;
+	flattenChannels(th, channels, chans);
+	for (size_t i = 0; i < chans.size(); ++i) {
+		if (chans[i].isReal() && std::fabs(chans[i].f) > 1.) {
+			post("play : channel %zu is the constant %g; a constant outside -1..1 sends DC to the output\n", i,
+				chans[i].f);
+			throw errOutOfRange;
+		}
+	}
 	std::string name = "sapf-play-" + std::to_string(++gPlayCount);
 	std::string def = compileSynthDef(th, channels, name);
 	// at the tail of the root group, after any ola voices it reads; its ola voices stop when it
