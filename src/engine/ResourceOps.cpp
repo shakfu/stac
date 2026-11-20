@@ -188,12 +188,7 @@ void audio_(Thread& th, Prim* prim)
 void control_(Thread& th, Prim* prim)
 {
 	int64_t n = popCount(th, "bus.control : channels", 64);
-	int bus = gControlBuses.take((int)n);
-	if (bus < 0) {
-		post("bus.control : no %d free control buses of %d\n", (int)n, kControlBuses);
-		throw errOutOfRange;
-	}
-	th.push(V(new Bus(bus, (int)n, true)));
+	th.push(V(new Bus(takeControlBuses((int)n, "bus.control"), (int)n, true)));
 }
 
 // [address args...] send: SC's sendMsg. Whole reals go as ints, others as floats, as sclang's
@@ -285,6 +280,19 @@ int takeAudioBuses(int n, const char* word)
 	}
 	return bus;
 }
+
+int takeControlBuses(int n, const char* word)
+{
+	int bus = gControlBuses.take(n);
+	if (bus < 0) {
+		post("%s : no %d free control buses of %d\n", word, n, kControlBuses);
+		throw errOutOfRange;
+	}
+	return bus;
+}
+
+void giveAudioBuses(int at) { gAudioBuses.give(at); }
+void giveControlBuses(int at) { gControlBuses.give(at); }
 
 void AddResourceOps();
 void AddResourceOps()

@@ -658,17 +658,20 @@ std::string compileDef(Thread& th, Arg channels, const std::string& name, DefPar
 	std::map<UGenNode*, bool> seen;
 	P<UGenNode> outNode;
 	if (!chans.empty()) {
-		// Out.ar takes audio-rate inputs only.
+		// Out.ar takes audio-rate inputs only; Out.kr takes no audio-rate ones.
 		std::vector<V> outInputs = {g.remap(parts.outBus)};
+		bool kr = parts.outRate == rateKR;
 		for (Arg c : chans) {
-			if (c.isReal())
+			if (kr)
+				outInputs.push_back(rateOf(c) == rateAR ? makeUGen("A2K", rateKR, {c}) : V(c));
+			else if (c.isReal())
 				outInputs.push_back(makeUGen("DC", rateAR, {c}));
 			else if (rateOf(c) != rateAR)
 				outInputs.push_back(makeUGen("K2A", rateAR, {c}));
 			else
 				outInputs.push_back(c);
 		}
-		outNode = new UGenNode("Out", rateAR, outInputs, 0, 0, false);
+		outNode = new UGenNode("Out", kr ? rateKR : rateAR, outInputs, 0, 0, false);
 		collect(outNode(), ugens, seen);
 	}
 	for (UGenNode* r : roots) collect(r, ugens, seen);

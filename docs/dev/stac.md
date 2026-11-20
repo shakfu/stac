@@ -409,7 +409,7 @@ synthdef beep freq:440 amp:.1 [freq sinosc amp *]
 
 ### Proposal: unified definitions
 
-Status: built 2026-10-16 (`parseDefHeader` in `Parser.cpp`), except the linter warning on a library `def` without `-->`. It replaced the earlier `def NAME PARAM* = [BODY]`, which defined a SynthDef, with three statements of one shape: `def` for functions, `synthdef` for SynthDefs, `const` for constants. Built differences: `num` accepts a list as well as a real, because arithmetic maps over lists; a def without `-->` gets the stack effect `(params --> ?)`. The dictionary review converted `std.stac` to typed `def`s and `const`s; `sapf.stac`'s definitions stay lambdas.
+Status: built 2026-10-16 (`parseDefHeader` in `Parser.cpp`), except the linter warning on a library `def` without `-->`. It replaced the earlier `def NAME PARAM* = [BODY]`, which defined a SynthDef, with three statements of one shape: `def` for functions, `synthdef` for SynthDefs, `const` for constants. Built differences: `num` accepts a list as well as a real, because arithmetic maps over lists; a def without `-->` gets the stack effect `(params --> ?)`. The dictionary review converted `std.stac` to typed `def`s and `const`s, and `sapf.stac`'s 46 lambdas later followed; its two event Forms, `ev-base` and `tink`, stay `=` bindings, as data a user may rebind.
 
 ```
 def lfo freq phase lo hi --> sig

@@ -920,13 +920,13 @@ With SC's arguments: `sc.playbuf` takes numChannels and a buffer, not a file nam
 
 ### urandz
 
-`urandz (--> r)`
+`urandz (--> sig)`
 
 A signal of uniform random numbers from 0 to 1.
 
 ### nurandz
 
-`nurandz (n --> r)`
+`nurandz (n --> sig)`
 
 n uniform random numbers from 0 to 1, as a finite signal.
 
@@ -934,13 +934,13 @@ n uniform random numbers from 0 to 1, as a finite signal.
 
 ### brandz
 
-`brandz (--> r)`
+`brandz (--> sig)`
 
 A signal of uniform random numbers from -1 to 1.
 
 ### nbrandz
 
-`nbrandz (n --> r)`
+`nbrandz (n --> sig)`
 
 n uniform random numbers from -1 to 1, as a finite signal.
 
@@ -948,25 +948,25 @@ n uniform random numbers from -1 to 1, as a finite signal.
 
 ### iwalkz
 
-`iwalkz (step lo hi --> signal)`
+`iwalkz (step lo hi --> sig)`
 
 An integer random walk with the given step, kept between lo and hi.
 
 ### iwalk2z
 
-`iwalk2z (step bounds --> signal)`
+`iwalk2z (step limit --> sig)`
 
 An integer random walk with the given step, kept between -bounds and bounds.
 
 ### walkz
 
-`walkz (step lo hi --> signal)`
+`walkz (step lo hi --> sig)`
 
 A random walk with the given step, kept between lo and hi.
 
 ### walk2z
 
-`walk2z (step bounds --> signal)`
+`walk2z (step limit --> sig)`
 
 A random walk with the given step, kept between -bounds and bounds.
 
@@ -974,43 +974,43 @@ A random walk with the given step, kept between -bounds and bounds.
 
 ### oltx
 
-`oltx (sounds susTime xfadeTime density numChannels --> out)`
+`oltx (sounds susTime xfadeTime density numChannels --> sig)`
 
 A texture of overlapping sounds, after SC2's `OverlapTexture`. Each sound fades in and out over xfadeTime around susTime; density sets the overlap. Built on `sapf.ola`.
 
 ### xftx
 
-`xftx (sounds susTime xfadeTime numChannels --> out)`
+`xftx (sounds susTime xfadeTime numChannels --> sig)`
 
 A texture of crossfaded sounds, after SC2's `XFadeTexture`. Built on `sapf.ola`.
 
 ### lfo
 
-`lfo (freq phase lo hi --> out)`
+`lfo (freq phase lo hi --> sig)`
 
 A sine LFO from lo to hi, linear in between. Phase is in cycles.
 
 ### xlfo
 
-`xlfo (freq phase lo hi --> out)`
+`xlfo (freq phase lo hi --> sig)`
 
 A sine LFO from lo to hi, exponential in between. Phase is in cycles.
 
 ### splay
 
-`splay (x --> out)`
+`splay (x --> sig)`
 
 Spreads a list of mono sources evenly across the stereo field.
 
 ### rsplay
 
-`rsplay (x --> out)`
+`rsplay (x --> sig)`
 
 Spreads a list of mono sources across the stereo field by rotation.
 
 ### splayd
 
-`splayd (x maxdelay --> out)`
+`splayd (x maxdelay --> sig)`
 
 Spreads a list of mono sources across the stereo field by interaural time delay, up to maxdelay.
 
@@ -1018,13 +1018,13 @@ Spreads a list of mono sources across the stereo field by interaural time delay,
 
 ### apverb4
 
-`apverb4 (in delayTime decayTime --> out)`
+`apverb4 (in delayTime decayTime --> sig)`
 
 A four-stage stereo all pass reverb with random delay times.
 
 ### apverb6
 
-`apverb6 (in delayTime decayTime --> out)`
+`apverb6 (in delayTime decayTime --> sig)`
 
 A six-stage stereo all pass reverb with random delay times.
 
@@ -1032,55 +1032,55 @@ A six-stage stereo all pass reverb with random delay times.
 
 ### rline
 
-`rline (dur lo hi --> out)`
+`rline (dur lo hi --> sig)`
 
 A linear line over dur whose two ends are uniform random values between lo and hi.
 
 ### xrline
 
-`xrline (dur lo hi --> out)`
+`xrline (dur lo hi --> sig)`
 
 A linear line over dur whose two ends are exponential random values between lo and hi.
 
 ### rxline
 
-`rxline (dur lo hi --> out)`
+`rxline (dur lo hi --> sig)`
 
 An exponential line over dur whose two ends are uniform random values between lo and hi.
 
 ### xrxline
 
-`xrxline (dur lo hi --> out)`
+`xrxline (dur lo hi --> sig)`
 
 An exponential line over dur whose two ends are exponential random values between lo and hi.
 
 ### rpanl2
 
-`rpanl2 (in --> out)`
+`rpanl2 (in --> sig)`
 
 Pans a mono input to a fixed random stereo position.
 
 ### rpan2
 
-`rpan2 (in --> out)`
+`rpan2 (in --> sig)`
 
 Pans a mono input to a fixed random stereo position by interaural time delay.
 
 ### rbal2
 
-`rbal2 (a b --> out)`
+`rbal2 (a b --> sig)`
 
 Balances a stereo pair at a fixed random position.
 
 ### rrot2
 
-`rrot2 (in --> out)`
+`rrot2 (in --> sig)`
 
 Rotates a stereo pair by a fixed random amount.
 
 ### rsweeppan2
 
-`rsweeppan2 (in dur --> out)`
+`rsweeppan2 (in dur --> sig)`
 
 Pans a mono input along a random sweep over dur.
 
@@ -1088,37 +1088,37 @@ Pans a mono input along a random sweep over dur.
 
 ### crossover
 
-`crossover (in freq --> high_band low_band)`
+`crossover (in freq --> sig sig)`
 
-Linkwitz-Riley crossover: splits the input at freq into high and low bands that sum flat.
+Linkwitz-Riley crossover: splits the input at freq into bands that sum flat, leaving the high band, then the low band on top.
 
 ### crossover1
 
-`crossover1 (in freq --> high_band low_band)`
+`crossover1 (in freq --> sig sig)`
 
-First-order crossover: splits the input at freq into high and low bands that sum flat.
+First-order crossover: splits the input at freq into bands that sum flat, leaving the high band, then the low band on top.
 
 ### midcrossover
 
-`midcrossover (in freq bw --> outer_band inner_band)`
+`midcrossover (in freq bw --> sig sig)`
 
-Splits the input into a band of width bw around freq and the rest, which sum flat.
+Splits the input into the rest and a band of width bw around freq, which sum flat, leaving the band on top.
 
 ### crossovermix
 
-`crossovermix (a b freq --> out)`
+`crossovermix (a b freq --> sig)`
 
 Mixes a and b through a Linkwitz-Riley crossover at freq: the low band of one with the high band of the other.
 
 ### crossover1mix
 
-`crossover1mix (a b freq --> out)`
+`crossover1mix (a b freq --> sig)`
 
 Mixes a and b through a first-order crossover at freq.
 
 ### midcrossovermix
 
-`midcrossovermix (a b freq bw --> out)`
+`midcrossovermix (a b freq bw --> sig)`
 
 Mixes a and b through a middle crossover of width bw around freq.
 
@@ -1126,19 +1126,19 @@ Mixes a and b through a middle crossover of width bw around freq.
 
 ### combnw
 
-`combnw (in delay maxdelay decay wet --> out)`
+`combnw (in delay maxdelay decay wet --> sig)`
 
 `sapf.combn` with a wet and dry mix; wet is the delayed fraction.
 
 ### comblw
 
-`comblw (in delay maxdelay decay wet --> out)`
+`comblw (in delay maxdelay decay wet --> sig)`
 
 `sapf.combl` with a wet and dry mix; wet is the delayed fraction.
 
 ### combcw
 
-`combcw (in delay maxdelay decay wet --> out)`
+`combcw (in delay maxdelay decay wet --> sig)`
 
 `sapf.combc` with a wet and dry mix; wet is the delayed fraction.
 
@@ -1146,63 +1146,71 @@ Mixes a and b through a middle crossover of width bw around freq.
 
 ### blah
 
-`blah (pch dyn dur pan -> outs)`
+`blah (pch dyn dur pan --> sig)`
 
 A synth voice: saw, filter, amplitude envelope. pch is a pitch, dyn a dynamic, pan a stereo position.
 
 ### lfblah
 
-`lfblah (pch dyn dur pan -> outs)`
+`lfblah (pch dyn dur pan --> sig)`
 
 As `blah`, with a non band limited `sapf.lfsaw`.
 
 ### saw-syn
 
-`saw-syn (freq db dur pan harms adsr --> out)`
+`saw-syn (freq db dur pan harms adsr --> sig)`
 
 A sawtooth synth voice: freq in Hz, db peak level, dur seconds, pan, harms setting the filter cutoff, adsr the envelope list.
 
 ### square-syn
 
-`square-syn (freq db dur pan harms adsr --> out)`
+`square-syn (freq db dur pan harms adsr --> sig)`
 
 A square wave synth voice, with the arguments of `saw-syn`.
 
 ### pulse-syn
 
-`pulse-syn (freq duty db dur pan harms adsr --> out)`
+`pulse-syn (freq duty db dur pan harms adsr --> sig)`
 
 A variable width pulse synth voice; duty is the pulse width. Otherwise as `saw-syn`.
 
 ### osc-syn
 
-`osc-syn (freq db dur pan harms adsr wt --> out)`
+`osc-syn (freq db dur pan harms adsr wt --> sig)`
 
 A wavetable synth voice over the table wt. Otherwise as `saw-syn`.
 
 ### saw-rsyn
 
-`saw-rsyn (freq db dur pan harms rq adsr --> out)`
+`saw-rsyn (freq db dur pan harms rq adsr --> sig)`
 
 As `saw-syn`, through a resonant low pass with rq 1/Q.
 
 ### square-rsyn
 
-`square-rsyn (freq db dur pan harms rq adsr --> out)`
+`square-rsyn (freq db dur pan harms rq adsr --> sig)`
 
 As `square-syn`, through a resonant low pass with rq 1/Q.
 
 ### fm-syn
 
-`fm-syn (freq c m mx fb db dur pan adsr --> out)`
+`fm-syn (freq c m mx fb db dur pan adsr --> sig)`
 
 An FM synth voice: c and m multiply freq for carrier and modulator, mx is the index in cycles, fb the modulator's self feedback.
 
 ### fm-syn3
 
-`fm-syn3 (freq c m mx fb db dur pan adsr --> out)`
+`fm-syn3 (freq c m mx fb db dur pan adsr --> sig)`
 
 As `fm-syn`, with three detuned carriers and one modulator.
+
+### adsrenv
+
+`adsrenv (adsr dur --> sig)`
+
+An envelope signal for a note of dur seconds, from a list `[attack decay sustain release]`: it holds the sustain level until dur, then releases. The `-syn` voices build their envelopes with it.
+
+Use it for a voice of your own that takes the same `adsr` list as `saw-syn`.
 
 ## events
 

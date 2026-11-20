@@ -561,10 +561,11 @@ void pdef_(Thread& th, Prim* prim) { th.push(V(pdefOn(th, defaultClock()))); }
 // SC's ProxySynthDef: the channels times EnvGate, an EnvGen from 0 to 1 and back over fadeTime with
 // a 'sin curve, released by gate and freeing the synth.
 std::string fadeDef(Thread& th, std::vector<V> const& flat, std::string const& name,
-	std::vector<P<UGenNode>> const& roots = {})
+	std::vector<P<UGenNode>> const& roots = {}, int rate = rateAR)
 {
 	DefParts parts;
 	parts.roots = roots;
+	parts.outRate = rate;
 	V gate = makeParam("gate", 1., paramKR, 0), fade = makeParam("fadeTime", .02, paramKR, 1);
 	parts.params = {gate, fade, makeParam("out", 0., paramKR, 2)};
 	parts.outBus = parts.params[2];
@@ -595,11 +596,13 @@ std::string releaseFade(int node)
 
 // A named sound, as SC's Ndef: its synth writes a private bus, and a monitor synth at the tail of
 // the root copies that bus to bus 0. Each ndef starts a synth that fades in and releases the one before it.
+// A source with no audio-rate channel makes a control-rate ndef: control buses and no monitor.
 class Ndef : public Object
 {
 public:
 	std::string mName;
-	int mBus = -1, mChannels = 0;  // taken on the first run and kept
+	int mBus = -1, mChannels = 0;  // taken on the first run and kept until clear
+	int mRate = rateAR;            // set with the bus
 	int mNode = -1;                // the current synth, or -1
 	int mMonitor = -1;             // the monitor synth, or -1
 	int mDefs = 0;
@@ -613,8 +616,32 @@ public:
 	virtual void print(Thread& th, std::string& out, int depth) override
 	{
 		out += "Ndef " + mName + (mNode < 0 ? " (stopped" : " (node " + std::to_string(mNode));
-		if (mBus >= 0) out += ", bus " + std::to_string(mBus);
-		out += mNode >= 0 && mMonitor < 0 ? ", not monitored)" : ")";
+		if (mBus >= 0) out += std::string(mRate == rateKR ? ", control bus " : ", bus ") + std::to_string(mBus);
+		out += mNode >= 0 && mMonitor < 0 && mRate == rateAR ? ", not monitored)" : ")";
+	}
+
+	// The bus at rate, converted as SC's NodeProxy.ar and .kr do.
+	V read(int rate) const
+	{
+		if (mBus < 0) {
+			post("ndef %s has no bus: it was cleared, or has not run\n", mName.c_str());
+			throw errFailed;
+		}
+		if (mRate == rateKR) {
+			V in = makeUGen("In", rateKR, {(double)mBus}, mChannels, 0, false, true);
+			return rate == rateKR ? in : convert(in, "K2A", rateAR);
+		}
+		V in = makeUGen("InFeedback", rateAR, {(double)mBus}, mChannels, 0, false, true);
+		return rate == rateAR ? in : convert(in, "A2K", rateKR);
+	}
+
+	static V convert(Arg in, const char* ugen, int rate)
+	{
+		if (!in.isList()) return makeUGen(ugen, rate, {in});
+		List* chans = (List*)in.o();
+		P<List> out = new List(itemTypeV, chans->mArray->size());
+		for (int64_t i = 0; i < chans->mArray->size(); ++i) out->add(makeUGen(ugen, rate, {chans->mArray->at(i)}));
+		return V(out);
 	}
 
 	// SC's monitor: InFeedback, so it reads the bus wherever the synth writing it sits.
@@ -635,11 +662,15 @@ public:
 	{
 		const char* name = symbolOf(key);
 		if (!name) return false;
-		if (!strcmp(name, "ar")) {
-			ioValue = makeUGen("InFeedback", rateAR, {(double)mBus}, mChannels, 0, false, true);
+		if (!strcmp(name, "ar") || !strcmp(name, "kr")) {
+			ioValue = read(name[0] == 'a' ? rateAR : rateKR);
 			return true;
 		}
 		if (!strcmp(name, "play")) {
+			if (mRate == rateKR) {
+				post("play : ndef %s is control rate; it has no monitor\n", mName.c_str());
+				throw errFailed;
+			}
 			if (mNode >= 0 && mMonitor < 0) {
 				std::vector<std::string> sync;
 				std::string start = monitorMsgs(th, sync);
@@ -654,6 +685,18 @@ public:
 				if (mNode >= 0) scsynthSend(releaseFade(mNode));
 				mNode = -1;
 			}
+		} else if (!strcmp(name, "clear")) {
+			// SC's clear, with its default fadeTime of 0: frees the synths now and returns the bus, so
+			// the next run takes a new bus at its own rate and channel count
+			// timed as a run's bundle, so a clear just after a run frees the synths it starts
+			std::vector<std::string> frees;
+			for (int node : {mNode, mMonitor})
+				if (node >= 0) frees.push_back(oscMessage("/n_free", {{OscArg::Int, node, ""}}));
+			if (!frees.empty()) scsynthSend(oscBundle(scsynthNow() + kLookahead, frees, true));
+			if (mBus >= 0) (mRate == rateKR ? giveControlBuses : giveAudioBuses)(mBus);
+			mNode = mMonitor = mBus = -1;
+			mChannels = 0;
+			mRate = rateAR;
 		} else if (!strcmp(name, "set")) {
 			V form = th.pop();
 			if (!form.isForm()) wrongType("set : fields", "Form", form);
@@ -693,7 +736,9 @@ void ndef_(Thread& th, Prim* prim)
 	P<Ndef>& nd = gNdefs[s];
 	if (!nd) nd = new Ndef(s);
 	if (nd->mBus < 0) {
-		nd->mBus = takeAudioBuses((int)flat.size(), "ndef");
+		bool kr = std::none_of(flat.begin(), flat.end(), [](Arg c) { return rateOf(c) == rateAR; });
+		nd->mRate = kr ? rateKR : rateAR;
+		nd->mBus = kr ? takeControlBuses((int)flat.size(), "ndef") : takeAudioBuses((int)flat.size(), "ndef");
 		nd->mChannels = (int)flat.size();
 	}
 	// SC's NumChannels: more channels than the bus mix down in consecutive groups.
@@ -713,13 +758,13 @@ void ndef_(Thread& th, Prim* prim)
 	auto loaded = std::make_shared<LoadedTables>();
 	std::vector<std::string> packets = loadWavetables(th, channels, *loaded);
 	for (std::string const& m : loadSamples(th, channels, *loaded, true)) packets.push_back(m);
-	packets.push_back(oscMessage("/d_recv", {{OscArg::Blob, 0, fadeDef(th, flat, defName, roots)}}));
+	packets.push_back(oscMessage("/d_recv", {{OscArg::Blob, 0, fadeDef(th, flat, defName, roots, nd->mRate)}}));
 	// The new synth starts as the old one is released, so their fades overlap. A first run, or a
 	// run after end or stop, starts the monitor too.
 	int node = newNodeID();
 	std::vector<std::string> msgs = {sendFade(node, nd->mFadeTime, defName, 0, nd->mBus)};
 	if (nd->mNode >= 0) msgs.push_back(releaseFade(nd->mNode));
-	else if (nd->mMonitor < 0) msgs.push_back(nd->monitorMsgs(th, packets));
+	else if (nd->mMonitor < 0 && nd->mRate == rateAR) msgs.push_back(nd->monitorMsgs(th, packets));
 	checkServer(scsynthSendSync(packets), "ndef");
 	double at = scsynthNow() + kLookahead;
 	scsynthSend(oscBundle(at, msgs, true));
@@ -864,8 +909,9 @@ void AddPatternOps()
 	vm.def("ndef", 2, 1, ndef_,
 		"(channels name --> ndef) plays channels on a private bus, fading in over fadeTime (.02 s), and monitors "
 		"the bus on bus 0. Run again with the same name, it fades the new sound in and the old one out, and pushes "
-		"the same ndef. nd.ar reads its bus; nd.stop and nd.play fade the monitor out and in; nd.end fades out both; "
-		"{:fadeTime t} nd.set sets the fade.");
+		"the same ndef. nd.ar and nd.kr read its bus; nd.stop and nd.play fade the monitor out and in; nd.end fades out "
+		"both; nd.clear frees both and the bus; {:fadeTime t} nd.set sets the fade. A source with no audio-rate channel "
+		"plays on control buses, with no monitor.");
 
 	vm.addBifHelp(std::string("\n*** clock ***"));
 	P<Namespace> clock = new Namespace("clock");

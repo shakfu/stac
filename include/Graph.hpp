@@ -147,6 +147,7 @@ V makeParam(const char* name, double value, int kind = paramKR, int order = -1);
 struct DefParts {
 	std::vector<V> params;
 	V outBus = 0.;
+	int outRate = rateAR;  // rateKR writes a control bus with Out.kr
 	std::vector<P<UGenNode>> roots;
 };
 

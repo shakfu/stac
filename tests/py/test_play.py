@@ -406,3 +406,43 @@ def test_ndef_crossfades_and_stops(server, sapf, tmp_path):
     finally:
         out = proc.communicate(timeout=5)[0]
     assert "error" not in out, out
+
+
+def control_bus_of(out):
+    return int(out.split("control bus ", 1)[1].split(")")[0])
+
+
+def test_control_rate_ndef_writes_a_control_bus(server, sapf):
+    """A source with no audio-rate channel plays on a control bus, with no monitor."""
+    out = sapf(".5 'k ndef = k  k pr cr")
+    assert "error" not in out, out
+    time.sleep(.4)  # the lookahead, then the .02 s fade in
+    assert synths(server) == 1
+    bus = control_bus_of(out)
+    assert list(query("/c_get", bus)) == [bus, pytest.approx(.5)]
+
+
+def test_ndef_reads_at_either_rate(server, sapf):
+    out = sapf("2 sc.lfnoise1.kr 'k ndef = k  300 0 sinosc 0 * 'a ndef = a\n"
+               "[k.ar a.kr + 0 *] play  [k.kr a.ar * 0 *] play")
+    assert "error" not in out, out
+    time.sleep(.4)
+    assert synths(server) == 5  # k; a and its monitor; two readers
+
+
+def test_control_rate_ndef_has_no_monitor(server, sapf):
+    out = sapf(".5 'k ndef = k  k.play")
+    assert "ndef k is control rate; it has no monitor" in out
+
+
+def test_ndef_clear_frees_its_synths_and_bus(server, sapf):
+    """clear frees the synth and monitor; the next run takes a new bus at its own rate."""
+    out = sapf("300 0 sinosc 0 * 'c ndef = c  c.clear  c pr cr  c.ar")
+    assert "Ndef c (stopped)" in out, out
+    assert "ndef c has no bus" in out
+    time.sleep(.4)
+    assert synths(server) == 0
+    out = sapf("300 0 sinosc 0 * 'c ndef = c  c.clear  .5 'c ndef pr cr")
+    assert "control bus" in out, out
+    time.sleep(.4)
+    assert synths(server) == 1

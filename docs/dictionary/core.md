@@ -6135,7 +6135,7 @@ p.stop
 
 `ndef (channels name --> ndef)`
 
-Plays channels under a name, as SC's `Ndef`: on a private bus, with a monitor to bus 0. Run again, it fades the new sound in and the old one out over `fadeTime`, .02 s, and pushes the same ndef. `nd.ar` reads its bus; `.stop` and `.play` fade the monitor; `.end` fades out both; `{:fadeTime t} nd.set` sets the fade.
+Plays channels under a name, as SC's `Ndef`: on a private bus, with a monitor to bus 0. Run again, it fades the new sound in and the old one out over `fadeTime`, .02 s, and pushes the same ndef. `nd.ar` and `nd.kr` read its bus; `.stop` and `.play` fade the monitor; `.end` fades out both; `.clear` frees both now and returns the bus; `{:fadeTime t} nd.set` sets the fade. A source with no audio-rate channel, such as a `.kr` UGen or a number, makes a control-rate ndef: it plays on control buses, with no monitor. The first run sets the rate and channel count until `.clear`.
 
 Use it to edit a sound while it plays without a click.
 
@@ -6144,6 +6144,9 @@ Use it to edit a sound while it plays without a click.
 {:fadeTime 2} d.set
 [[55 55.2] saw 800 .3 rlpf .1 *] 'drone ndef
 d.end
+.5 4 sc.lfnoise1.kr * 'wob ndef = w
+[300 w.kr 1 + * sinosc .1 *] play
+w.clear
 ```
 
 ## clock

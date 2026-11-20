@@ -29,6 +29,11 @@ int audioBusFloor();
 
 // The first of n consecutive private audio buses, as bus.audio takes them. Throws when none are free.
 int takeAudioBuses(int n, const char* word);
+// As takeAudioBuses, for control buses, as bus.control takes them.
+int takeControlBuses(int n, const char* word);
+// Returns the buses from `at`, as bus.free does.
+void giveAudioBuses(int at);
+void giveControlBuses(int at);
 
 // The sound-file buffer for `path`, as sf> and playbuf use, and the file's channels and frames
 // (Samples.cpp). Throws when the file is not a WAV or AIFF file, or 64 files are in use.

@@ -11,46 +11,46 @@ import sapf.N sapf.keep sapf.NZ sapf.T sapf.play
 
 "\\n*** unipolar random number generators ***" helpLine
 	
-\
-	"(--> r) return a signal of random numbers from 0 to 1."
-	[0 1 randz] = urandz
+def urandz --> sig
+	"return a signal of random numbers from 0 to 1."
+	[0 1 randz]
 	
-\n 
-	"(n --> r) return a signal of n random numbers from 0 to 1."
-	[n 0 1 nrandz] = nurandz
+def nurandz n --> sig
+	"return a signal of n random numbers from 0 to 1."
+	[n 0 1 nrandz]
 
 "\\n*** bipolar random number generators ***" helpLine
 	
-\
-	"(--> r) return a signal of random numbers from -1 to 1."
-	[1 rand2z] = brandz
+def brandz --> sig
+	"return a signal of random numbers from -1 to 1."
+	[1 rand2z]
 	
-\n 
-	"(n --> r) return a signal of n random numbers from -1 to 1."
-	[n 1 nrand2z] = nbrandz
+def nbrandz n --> sig
+	"return a signal of n random numbers from -1 to 1."
+	[n 1 nrand2z]
 	
 "\\n*** random walks ***" helpLine
 
-\step lo hi
-	"(step lo hi --> signal) integer random walk."
-	[step irand2z +\ lo hi irand + lo hi ifold  ] = iwalkz
+def iwalkz step lo hi --> sig
+	"integer random walk."
+	[step irand2z +\ lo hi irand + lo hi ifold  ]
 
-\step limit
-	"(step bounds --> signal) integer random walk. bipolar bounds."
-	[step irand2z +\ limit irand2 + limit ifold2  ] = iwalk2z
+def iwalk2z step limit --> sig
+	"integer random walk. bipolar bounds."
+	[step irand2z +\ limit irand2 + limit ifold2  ]
 
-\step lo hi
-	"(step lo hi --> signal) random walk."
-	[step rand2z +\ lo hi rand + lo hi fold  ] = walkz
+def walkz step lo hi --> sig
+	"random walk."
+	[step rand2z +\ lo hi rand + lo hi fold  ]
 
-\step limit
-	"(step bounds --> signal) random walk. bipolar bounds."
-	[step rand2z +\ limit rand2 + limit fold2  ] = walk2z
+def walk2z step limit --> sig
+	"random walk. bipolar bounds."
+	[step rand2z +\ limit rand2 + limit fold2  ]
 
 "\\n*** composite ugens ***" helpLine
 
-\sounds susTime xfadeTime density numChannels
-	"(sounds susTime xfadeTime density numChannels --> out) texture of overlapping sounds. OverlapTexture, adapted from SC2"
+def oltx sounds susTime xfadeTime density numChannels --> sig
+	"texture of overlapping sounds. OverlapTexture, adapted from SC2"
 	[
 		xfadeTime 2 * susTime + density / = period 
 		#[0 1 1 0] = levels
@@ -58,10 +58,10 @@ import sapf.N sapf.keep sapf.NZ sapf.T sapf.play
 		`sounds type 'Fun equals 
 		\[ \i[ i sounds levels times 1 lines * ] period 1 numChannels ola ]
 		\[ sounds @ \sound[ sound levels times 1 lines *] ! period 1 numChannels ola ] if
-	] = oltx
+	]
 
-\sounds susTime xfadeTime numChannels
-	"(sounds susTime xfadeTime numChannels --> out) texture of crossfaded sounds. XFadeTexture, adapted from SC2"
+def xftx sounds susTime xfadeTime numChannels --> sig
+	"texture of crossfaded sounds. XFadeTexture, adapted from SC2"
 	[
 		xfadeTime susTime + = period 
 		#[0 1 1 0] = levels
@@ -69,110 +69,110 @@ import sapf.N sapf.keep sapf.NZ sapf.T sapf.play
 		`sounds type 'Fun equals 
 		\[ \i[ i sounds levels times 1 lines * ] period 1 numChannels ola ]
 		\[ sounds @ \sound[ sound levels times 1 lines *] ! period 1 numChannels ola ] if
-	] = xftx
+	]
 
-\freq phase lo hi 
-	"(freq phase lo hi --> out) sine wave lfo with linear range."
-	[freq phase sinosc lo hi bilin] = lfo
+def lfo freq phase lo hi --> sig
+	"sine wave lfo with linear range."
+	[freq phase sinosc lo hi bilin]
 
-\freq phase lo hi 
-	"(freq phase lo hi --> out) sine wave lfo with exponential range."
-	[freq phase sinosc lo hi biexp] = xlfo
+def xlfo freq phase lo hi --> sig
+	"sine wave lfo with exponential range."
+	[freq phase sinosc lo hi biexp]
 
-\x 
-	"(x --> out) evenly spread an array of mono sources across a stereo field."
-	[x L1 aa size -1 1 lindiv pan2 +/] = splay
+def splay x --> sig
+	"evenly spread an array of mono sources across a stereo field."
+	[x L1 aa size -1 1 lindiv pan2 +/]
 
-\x 
-	"(x --> out) evenly spread an array of mono sources across a stereo field."
-	[x L1 = list x 0 list size -1 1 lindiv brand + rot2 +/] = rsplay
+def rsplay x --> sig
+	"evenly spread an array of mono sources across a stereo field."
+	[x L1 = list x 0 list size -1 1 lindiv brand + rot2 +/]
 
-\x maxdelay 
-	"(x maxdelay --> out) evenly spread an array of mono sources across a stereo field using interaural time delay."
-	[x L1 aa size -1 1 lindiv maxdelay itd +/] = splayd
+def splayd x maxdelay --> sig
+	"evenly spread an array of mono sources across a stereo field using interaural time delay."
+	[x L1 aa size -1 1 lindiv maxdelay itd +/]
 
 ;;.4 white .1 100 xmousex phaser play
 
 "\\n*** simple allpass reverbs ***" helpLine
 
-\in dly dcy 
-	"(in delayTime decayTime --> out) four stage stereo allpass with random delay times"
+def apverb4 in delayTime decayTime --> sig
+	"four stage stereo allpass with random delay times"
 	[	
 		in size 2 | = n
-		\z[ z \[.1m dly rand] n X aa dcy alpasn] = r
+		\z[ z \[.1m delayTime rand] n X aa decayTime alpasn] = r
 		in r r r r
-	] = apverb4
+	]
 
-\in dly dcy 
-	"(in delayTime decayTime --> out) six stage stereo allpass with random delay times"
-	[	\z[ z \[.1m dly rand] 2X aa dcy alpasn] = r
+def apverb6 in delayTime decayTime --> sig
+	"six stage stereo allpass with random delay times"
+	[	\z[ z \[.1m delayTime rand] 2X aa decayTime alpasn] = r
 		in r r r r r r
-	] = apverb6
+	]
 
 "\\n*** random sweeps and pans ***" helpLine
 
-\d a b
-	"(dur lo hi --> out) random line. both ends are uniformly random between lo and hi."
-	[d a b rand a b rand line] = rline
+def rline dur lo hi --> sig
+	"random line. both ends are uniformly random between lo and hi."
+	[dur lo hi rand lo hi rand line]
 
-\d a b
-	"(dur lo hi --> out) exponentially random line. both ends are exponentially random between lo and hi."
-	[d a b xrand a b xrand line] = xrline
+def xrline dur lo hi --> sig
+	"exponentially random line. both ends are exponentially random between lo and hi."
+	[dur lo hi xrand lo hi xrand line]
 
-\d a b
-	"(dur lo hi --> out) random exponential line. both ends are uniformly random between lo and hi."
-	[d a b rand a b rand xline] = rxline
+def rxline dur lo hi --> sig
+	"random exponential line. both ends are uniformly random between lo and hi."
+	[dur lo hi rand lo hi rand xline]
 
-\d a b
-	"(dur lo hi --> out) exponentially random exponential line. both ends are exponentially random between lo and hi."
-	[d a b xrand a b xrand xline] = xrxline
+def xrxline dur lo hi --> sig
+	"exponentially random exponential line. both ends are exponentially random between lo and hi."
+	[dur lo hi xrand lo hi xrand xline]
 
-\in 
-	"(in --> out) stereo pan at a fixed random position."
-	[in 1 rand2 pan2] = rpanl2
+def rpanl2 in --> sig
+	"stereo pan at a fixed random position."
+	[in 1 rand2 pan2]
 
-\in 
-	"(in --> out) stereo pan at a fixed random position."
-	[in 1 rand2 1m itd] = rpan2
+def rpan2 in --> sig
+	"stereo pan at a fixed random position."
+	[in 1 rand2 1m itd]
 
-\a b 
-	"(a b --> out) stereo balance at a fixed random position."
-	[a b 1 rand2 bal2] = rbal2
+def rbal2 a b --> sig
+	"stereo balance at a fixed random position."
+	[a b 1 rand2 bal2]
 
-\in 
-	"(in --> out) stereo rotation at a fixed random position."
-	[in 0 1 rand2 rot2] = rrot2
+def rrot2 in --> sig
+	"stereo rotation at a fixed random position."
+	[in 0 1 rand2 rot2]
 
-\in dur
-	"(in dur --> out) stereo pan with a random sweep."
-	[in dur 1 rand2 1 rand2 line pan2] = rsweeppan2
+def rsweeppan2 in dur --> sig
+	"stereo pan with a random sweep."
+	[in dur 1 rand2 1 rand2 line pan2]
 
 
 "\\n*** crossover filters ***" helpLine
 
-\in freq
-	"(in freq --> high_band low_band) Linkwitz-Riley crossover filters. low_band + high_band yields a flat frequency response."
-	[in freq hpf2  in freq lpf2] = crossover
+def crossover in freq --> sig sig
+	"Linkwitz-Riley crossover filters: the high band, then the low band. Their sum has a flat frequency response."
+	[in freq hpf2  in freq lpf2]
 
-\in freq
-	"(in freq --> high_band low_band) first order crossover filters. low_band + high_band yields a flat frequency response."
-	[in freq hpf1  in freq lpf1] = crossover1
+def crossover1 in freq --> sig sig
+	"first order crossover filters: the high band, then the low band. Their sum has a flat frequency response."
+	[in freq hpf1  in freq lpf1]
 
-\in freq bw
-	"(in freq bw --> outer_band inner_band) middle crossover. outer_band + inner_band yields a flat frequency response."
-	[in freq bw bsf  in freq bw bpf] = midcrossover
+def midcrossover in freq bw --> sig sig
+	"middle crossover: the outer band, then the inner band. Their sum has a flat frequency response."
+	[in freq bw bsf  in freq bw bpf]
 
-\a b freq
-	"(a b freq --> out) Linkwitz-Riley crossover mixer."
-	[a freq hpf2  b freq lpf2 +] = crossovermix
+def crossovermix a b freq --> sig
+	"Linkwitz-Riley crossover mixer."
+	[a freq hpf2  b freq lpf2 +]
 
-\a b freq
-	"(a b freq --> out) Linkwitz-Riley crossover mixer."
-	[a freq hpf1  b freq lpf1 +] = crossover1mix
+def crossover1mix a b freq --> sig
+	"Linkwitz-Riley crossover mixer."
+	[a freq hpf1  b freq lpf1 +]
 
-\a b freq bw
-	"(a b freq bw --> out) Linkwitz-Riley crossover mixer."
-	[a freq bw bsf  b freq bw bpf +] = midcrossovermix
+def midcrossovermix a b freq bw --> sig
+	"Linkwitz-Riley crossover mixer."
+	[a freq bw bsf  b freq bw bpf +]
 
 
 ;; crossover tests:
@@ -182,39 +182,39 @@ import sapf.N sapf.keep sapf.NZ sapf.T sapf.play
 
 "\\n*** delays with wet/dry mix ***" helpLine
 
-\in delay maxdelay decay wet
-	"(in delay maxdelay decay wet --> out) combn delay with wet/dry mix control."
-	[in  in delay maxdelay decay combn wet fade2] = combnw 
+def combnw in delay maxdelay decay wet --> sig
+	"combn delay with wet/dry mix control."
+	[in  in delay maxdelay decay combn wet fade2]
 	
-\in delay maxdelay decay wet
-	"(in delay maxdelay decay wet --> out) combl delay with wet/dry mix control."
-	[in  in delay maxdelay decay combl wet fade2] = comblw 
+def comblw in delay maxdelay decay wet --> sig
+	"combl delay with wet/dry mix control."
+	[in  in delay maxdelay decay combl wet fade2]
 	
-\in delay maxdelay decay wet
-	"(in delay maxdelay decay wet --> out) combc delay with wet/dry mix control."
-	[in  in delay maxdelay decay combc wet fade2] = combcw
+def combcw in delay maxdelay decay wet --> sig
+	"combc delay with wet/dry mix control."
+	[in  in delay maxdelay decay combc wet fade2]
 
 
 "\\n*** synths ***" helpLine
 
-\pch dyn dur pan 
-	"(pch dyn dur pan -> outs) saw->filter->amp synth voice"
+def blah pch dyn dur pan --> sig
+	"saw->filter->amp synth voice"
 [
 	#[0 1 .3 0] -3 #[3m .1 dur .103 - .1 |] 1 curves = env
 	dyn 0 1h 6h 12k linlinc env * = fc
 	dyn 0 1h -20 -10 linlinc dbamp = amp
 	pch 1/12 * ohz [.1 -.1] + 0 [1 1] rand saw fc lpf2 env amp * * 
-] = blah
+]
 
-\pch dyn dur pan 
-	"(pch dyn dur pan -> outs) lfsaw->filter->amp synth voice"
+def lfblah pch dyn dur pan --> sig
+	"lfsaw->filter->amp synth voice"
 [
 	#[0 1 .3 0] -3 #[3m .1 dur .103 - .1 |] 1 curves = env
 	
 	dyn 0 1h 6h 12k linlinc env * = fc
 	dyn 0 1h -20 -10 linlinc dbamp = amp
 	pch 1/12 * ohz [.1 -.1] + 0 [1 1] rand lfsaw fc lpf2 env amp * * 
-] = lfblah
+]
 
 ;; [-12 0 4 6 10 14 20] 2 - @ 70 12 0 blah 0 .3 by dly +/ play
 
@@ -234,79 +234,80 @@ import sapf.N sapf.keep sapf.NZ sapf.T sapf.play
 ;; wt - wavetable
 
 
-\adsr dur
+def adsrenv adsr dur --> sig
+	"an envelope signal for a note of dur seconds. adsr is [attack-time decay-time sustain-level release-time]."
 [
 	adsr un4 = r = s = d = a
 	#[0 1 s s 0] -3 #[a d dur a - d - 0 | r] 1 curves	
-] = adsrenv
+]
 
-\freq db dur pan harms adsr
-	"(freq db dur pan harms adsr --> out) sawtooth wave synth"
+def saw-syn freq db dur pan harms adsr --> sig
+	"sawtooth wave synth"
 [
 	adsr dur adsrenv = env
 	freq harms * freqLimit & env * = fc
 	db dbamp env * = amp
 	freq 0 saw fc lpf2 amp * pan pan2
-] = saw-syn
+]
 
-\freq db dur pan harms adsr
-	"(freq db dur pan harms adsr --> out) square wave synth"
+def square-syn freq db dur pan harms adsr --> sig
+	"square wave synth"
 [
 	adsr dur adsrenv = env
 	freq harms * freqLimit & env * = fc
 	db dbamp env * = amp
 	freq 0 .5 pulse fc lpf2 amp * pan pan2
-] = square-syn
+]
 
-\freq duty db dur pan harms adsr
-	"(freq duty db dur pan harms adsr --> out) variable width pulse wave synth"
+def pulse-syn freq duty db dur pan harms adsr --> sig
+	"variable width pulse wave synth"
 [
 	adsr dur adsrenv = env
 	freq harms * freqLimit & env * = fc
 	db dbamp env * = amp
 	freq 0 duty pulse fc lpf2 amp * pan pan2
-] = pulse-syn
+]
 
-\freq db dur pan harms adsr wt
-	"(freq db dur pan harms adsr wt --> out) wavetable oscillator synth"
+def osc-syn freq db dur pan harms adsr wt --> sig
+	"wavetable oscillator synth"
 [
 	adsr dur adsrenv = env
 	freq harms * freqLimit & env * = fc
 	db dbamp env * = amp
 	freq 0 wt osc fc lpf2 amp * pan pan2
-] = osc-syn
+]
 
 
-\freq db dur pan harms rq adsr
-	"(freq db dur pan harms rq adsr --> out) sawtooth wave synth with resonant lpf"
+def saw-rsyn freq db dur pan harms rq adsr --> sig
+	"sawtooth wave synth with resonant lpf"
 [
 	adsr dur adsrenv = env
 	freq harms * freqLimit & env * = fc
 	db dbamp env * = amp
 	freq 0 saw fc rq rlpf2 amp * pan pan2
-] = saw-rsyn
+]
 
-\freq db dur pan harms rq adsr
-	"(freq db dur pan harms rq adsr --> out) square wave synth with resonant lpf"
+def square-rsyn freq db dur pan harms rq adsr --> sig
+	"square wave synth with resonant lpf"
 [
 	adsr dur adsrenv = env
 	freq harms * freqLimit & env * = fc
 	db dbamp env * = amp
 	freq 0 .5 pulse fc rq rlpf2 amp * pan pan2
-] = square-rsyn
+]
 
-\freq c m mx fb db dur pan adsr
-	"(freq c m mx fb db dur pan adsr --> out) fm synth"
+def fm-syn freq c m mx fb db dur pan adsr --> sig
+	"fm synth"
 [
 	adsr dur adsrenv = env
 	db dbamp env * = amp
 	freq c * = cf
 	freq m * = mf
 	cf (mf 0 fb sinoscfb env mx * *) sinosc amp * pan pan2
-] = fm-syn
+]
 
-\freq c m mx fb db dur pan adsr
-	"(freq c m mx fb db dur pan adsr --> out) 3 detuned carrier, 1 modulator fm"
+def fm-syn3 freq c m mx fb db dur pan adsr --> sig
+	"3 detuned carrier, 1 modulator fm"
 [
 	adsr dur adsrenv = env
 	db dbamp env * = amp
@@ -314,7 +315,7 @@ import sapf.N sapf.keep sapf.NZ sapf.T sapf.play
 	freq m * = mf
 	mf 0 fb sinoscfb env mx * * = mod
 	cf mod sinosc cf .2 + mod sinosc cf .2 - mod sinosc + + amp * pan pan2
-] = fm-syn3
+]
 
 ;;;;;;;
 "\\n*** events ***" helpLine

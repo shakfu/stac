@@ -10,8 +10,6 @@ In order of priority within each section. Design records are in docs/dev/; this 
 
 - [ ] `stactool.py lint`: warn on a `def` without `-->` in a library file (docs/dev/stac.md, Proposal: unified definitions, open question 1).
 
-- [ ] `sapf.stac`'s 46 definitions are still lambdas. Convert them to typed `def`s as `std.stac` was, or record why not.
-
 - [ ] Dictionary: say that a zero-output UGen (Out, OffsetOut, ReplaceOut, XOut, LocalOut, SharedOut, SendTrig, AnalogOut, DigitalOut, BelaScopeOut) leaves a root, not a channel. Three parts: `gen_ugens.py` writes `--> root` as the effect of a zero-output class; one sentence in each of the 10 entries; a `localout` example with `play`.
 
 ### Namespaces and modules
@@ -23,10 +21,6 @@ In order of priority within each section. Design records are in docs/dev/; this 
 - [ ] Module reload is noticed when an `import` runs. A file watcher could reload on save; decide whether a half-saved file loading by itself is acceptable.
 
 ### Server objects
-
-- [ ] `ndef` at control rate: a control-rate source should take a control bus and no monitor, as SC's.
-
-- [ ] `ndef` keeps its bus for the session. SC's `clear` frees it; add `.clear`.
 
 - [ ] `>sd` and `.write`: write the SSP `scsy` sidecar's `@p` lines alongside `name.scsyndef`.
   - Format, from `../ssp/plugins/scsynth/README.md`: `name.txt` beside `name.scsyndef`, lines `// @p1 cutoff 20 20000 Hz log cv 3` (slot, control name, min, max, unit, curve, CV input).

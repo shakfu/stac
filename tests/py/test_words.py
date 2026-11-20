@@ -21,7 +21,7 @@ def test_words_lists_builtins_and_preludes(sapf_bin):
     assert core["sapf.sinosc"]["automap"] == "zz"
     assert "lfo" not in core
     lib = {w["name"]: w for w in words(*SAPF_LIB)}
-    assert lib["lfo"]["source"] == "prelude" and lib["lfo"]["effect"] == "(freq phase lo hi --> out)"
+    assert lib["lfo"]["source"] == "prelude" and lib["lfo"]["effect"] == "(freq phase lo hi --> sig)"
 
 
 def test_words_entry_fields(sapf_bin):

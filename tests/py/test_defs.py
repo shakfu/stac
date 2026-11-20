@@ -280,3 +280,9 @@ def test_const_survives_lines_but_not_a_module_reload(sapf_bin, tmp_path):
     out = proc.communicate(timeout=5)[0]
     assert "error" not in out, out
     assert "\n2\n" in out
+
+
+def test_event_fields_reach_a_def_by_parameter_name(sapf_bin, tmp_path):
+    """ev-base's :out applies the def osc-syn with !e, which binds its parameters from the event's fields."""
+    out = run_sapf("{:freq 440 :dur .5} ev-base = e  e.out pr cr", tmp_path)
+    assert "[Pan2.ar[0] Pan2.ar[1]]" in out, out

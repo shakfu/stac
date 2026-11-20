@@ -4,6 +4,7 @@
 
 ### Changed
 
+- `sapf.stac`'s 46 definitions are typed `def`s, as `std.stac`'s are: each call checks it leaves one signal, or two for the `crossover` words. Their stack effects are generated, e.g. `lfo (freq phase lo hi --> sig)`, over the hand-written ones the help strings carried. `adsrenv` gained a help line, so it is now a listed word.
 - `env.asr` takes SC's `(attackTime sustainLevel releaseTime)`: `.01 1 .3 env.asr`. It took `(attackTime releaseTime)` with the level fixed at 1, so an sclang argument list such as `.01 .5 1` bound .5 as the attack and left .01 on the stack.
 - The binary is `stac`, and its environment variables are `STAC_*`: `STAC_SCSYNTH`, `STAC_SYNTHDEFS`, `STAC_RECORDINGS`, `STAC_PRELUDE` and the rest. `sapf-prelude.txt` is `prelude.stac`; `sapf-examples.txt` is `examples/sapf.stac`. Phase 1 of `docs/dev/stac.md`. The `SAPF_` names are not read; rename them in your shell.
 - sapf's DSP words, `kr`, `ctl`, `>sd`, `>sf`, `>sfo`, `>nrt`, `ola`, `ramp` and the `ola` event-list words `evmerge`, `evdelay` and `evrest` are in the namespace `sapf`, not the core: `440 0 sapf.sinosc`. `prelude.stac` imports SC's UGens in their place, with SC's arguments: `440 sinosc` is `SinOsc.ar(440)`. `sapf.stac` imports the sapf words over them and holds the 48 prelude definitions built on them. Run sapf programs with `-p prelude.stac -p sapf.stac`; `-p` now repeats. Phase 5 of `docs/dev/stac.md`. The C++ stays; rewriting the words in stac would change output that 108 conformance cases check (`docs/dev/stac-phase5.md`).
@@ -87,6 +88,7 @@
   ```
 
 - `env.perc`, `env.adsr`, `env.asr` and `env.linen` take a Form of SC's arguments by name, as the generated UGen words do; a missing argument takes SC's default. The Form also reaches `level`, `peakLevel`, `curve` and `bias`, which the stack form leaves at their defaults: `{:sustainLevel .6 :curve -8} env.adsr`.
+- Control-rate `ndef`s and `.clear`. A source with no audio-rate channel, such as `4 sc.lfnoise1.kr` or `.5`, plays on control buses with no monitor, as SC's; `nd.kr` reads it, and `nd.ar` reads either rate. `nd.clear` frees the synth and monitor and returns the bus, as SC's `clear` with its default fadeTime of 0; the next run takes a new bus at its own rate and channel count.
 - A file run without `-i` warns when values are left on the stack at its end. A missing argument otherwise passes silently: a dropped `osc` made `>nrt` write a score of the wrong value. The warning is at the end of the run, not in `>nrt`, because the REPL keeps values on the stack on purpose.
 
 ### Fixed

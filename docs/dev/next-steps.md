@@ -4,7 +4,7 @@ State as of 2026-11-20, at ea18b2a and the working tree. ../ssp's state and task
 
 ## State
 
-- `make test` passes on macOS: 306 ctest; 1067 pytest passed, 112 skipped. CI (`.github/workflows/build.yml`) builds and tests on macOS and Ubuntu each push; it last passed at ea18b2a.
+- `make test` passes on macOS: 306 ctest; 1072 pytest passed, 112 skipped. CI (`.github/workflows/build.yml`) builds and tests on macOS and Ubuntu each push; it last passed at ea18b2a.
 
 - docs/dictionary/ has an entry for every word, 1330 in all, and docs/phrasebook.md 31 phrases; the tests run every example in both and in the README.
 
