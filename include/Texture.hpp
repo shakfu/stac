@@ -25,6 +25,10 @@ void playTextures(Thread& th, Arg channels, double startTime, std::shared_ptr<Lo
 // Ends the scheduler threads.
 void stopTextures();
 
+// Frees the defs of voices whose start bundles have not run. Call after /clearSched, which drops
+// those bundles and the /d_free each carries.
+void freePendingVoices();
+
 // The scheduler threads still running. They are detached; a host that unloads the interpreter's code
 // waits for none to run after stopTextures, and a moment more: a thread's arguments are destroyed
 // after it counts itself out.

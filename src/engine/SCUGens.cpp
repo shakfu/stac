@@ -1068,6 +1068,7 @@ void stopPlaying()
 	stopTextures();
 	stopEventStreams();
 	scsynthSend(oscMessage("/clearSched", {})); // ola voices already sent for later
+	freePendingVoices();
 	scsynthSend(oscMessage("/g_deepFree", {{OscArg::Int, 0, ""}}));
 }
 

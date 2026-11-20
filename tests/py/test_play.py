@@ -53,6 +53,14 @@ def synths(server):
     return status().contents[2]
 
 
+def wait_for_synth(server, timeout=5.0):
+    """Waits for the first synth, so timings count from it rather than from sapf's startup."""
+    deadline = time.monotonic() + timeout
+    while synths(server) == 0:
+        assert time.monotonic() < deadline, "no synth started"
+        time.sleep(0.01)
+
+
 def test_play_starts_a_synth_and_stop_frees_it(server, sapf):
     out = sapf("440 0 sinosc 0 * play")
     assert "error" not in out, out
@@ -109,19 +117,19 @@ def test_ola_voices_start_and_stop(server, sapf, tmp_path):
     src = tmp_path / "ola.sapf"
     src.write_text("\\i[ 0 0 sinosc .3 T ] .1 1 1 ola 0 at play\n")
     env = dict(os.environ, STAC_SCSYNTH=f"127.0.0.1:{PORT}")
+    defs = status().contents[4]
     proc = subprocess.Popen([str(SAPF), "-q", *SAPF_LIB, "-i", str(src)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, text=True, env=env)
     try:
-        time.sleep(1)
+        time.sleep(1.5)
         # The main synth and the voices of the last .3 s, .1 s apart.
         assert 3 <= synths(server) <= 5
-        defs = status().contents[4]
-        time.sleep(0.5)
-        assert status().contents[4] <= defs + 1, "voice defs are not freed"
         proc.stdin.write("stop\n")
         proc.stdin.flush()
         time.sleep(0.5)
         assert synths(server) == 0
+        # Every voice bundle sent frees its def; only the main def may remain. In flight, 0-2 are pending.
+        assert status().contents[4] <= defs + 1, "voice defs are not freed"
     finally:
         out = proc.communicate(timeout=5)[0]
     assert "error" not in out, out
@@ -344,7 +352,8 @@ def test_events_play_and_stop(server, sapf, tmp_path):
     """A synth per event, .2 s apart; player.stop ends the stream; stop frees the synths."""
     proc = interactive(TONE + "{:instrument 'tone :dur .2} pbind play = pl\n", tmp_path)
     try:
-        time.sleep(1.1)
+        wait_for_synth(server)
+        time.sleep(0.9)
         assert 4 <= synths(server) <= 7
         proc.stdin.write("pl.stop\n")
         proc.stdin.flush()

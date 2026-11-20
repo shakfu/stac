@@ -15,6 +15,7 @@
 #include <chrono>
 #include <cmath>
 #include <map>
+#include <mutex>
 #include <thread>
 
 extern P<String> s_out;
@@ -29,6 +30,9 @@ int gNextBus = kFirstBus;
 std::atomic<int64_t> gVoiceCount{0};
 std::atomic<int> gGeneration{0};
 std::atomic<int> gRunning{0};
+// Voice defs sent whose start bundle, which frees them, may not have run yet: name and start time.
+std::mutex gPendingMutex;
+std::vector<std::pair<std::string, double>> gPending;
 
 // The voice stream of one ola. Copies share the sounds and hops, each with its own position.
 class Texture : public Object
@@ -136,6 +140,13 @@ void schedule(std::shared_ptr<Thread> th, P<Texture> tx, double startTime, int g
 			if (!scsynthSendSync({oscMessage("/n_query", {{OscArg::Int, mainNode, ""}})}, 1000).empty()) break;
 			for (std::string const& m : loadWavetables(*th, out, *loaded)) scsynthSend(m);
 			for (std::string const& m : loadSamples(*th, out, *loaded, true)) scsynthSend(m);
+			{  // listed before sending, so freePendingVoices after /clearSched cannot miss it
+				std::lock_guard<std::mutex> lock(gPendingMutex);
+				double now = scsynthNow();
+				gPending.erase(std::remove_if(gPending.begin(), gPending.end(),
+					[now](auto const& p) { return p.second < now; }), gPending.end());
+				gPending.emplace_back(name, startTime + seconds);
+			}
 			scsynthSend(defRecv(def));
 			scsynthSend(oscBundle(startTime + seconds, {newSynth(name, 0), defFree(name)}, true));
 		}
@@ -157,6 +168,13 @@ void playTextures(Thread& th, Arg channels, double startTime, std::shared_ptr<Lo
 }
 
 void stopTextures() { ++gGeneration; }
+
+void freePendingVoices()
+{
+	std::lock_guard<std::mutex> lock(gPendingMutex);
+	for (auto const& p : gPending) scsynthSend(defFree(p.first));
+	gPending.clear();
+}
 
 int runningTextures() { return gRunning; }
 
