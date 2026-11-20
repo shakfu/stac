@@ -31,6 +31,7 @@ std::atomic<int64_t> gVoiceCount{0};
 std::atomic<int> gGeneration{0};
 std::atomic<int> gRunning{0};
 // Voice defs sent whose start bundle, which frees them, may not have run yet: name and start time.
+// The mutex also orders sending a voice against stopTextures.
 std::mutex gPendingMutex;
 std::vector<std::pair<std::string, double>> gPending;
 
@@ -140,15 +141,16 @@ void schedule(std::shared_ptr<Thread> th, P<Texture> tx, double startTime, int g
 			if (!scsynthSendSync({oscMessage("/n_query", {{OscArg::Int, mainNode, ""}})}, 1000).empty()) break;
 			for (std::string const& m : loadWavetables(*th, out, *loaded)) scsynthSend(m);
 			for (std::string const& m : loadSamples(*th, out, *loaded, true)) scsynthSend(m);
-			{  // listed before sending, so freePendingVoices after /clearSched cannot miss it
+			{  // stopTextures takes the lock: a voice is sent before stop's /clearSched, or not at all
 				std::lock_guard<std::mutex> lock(gPendingMutex);
+				if (generation != gGeneration) break;
 				double now = scsynthNow();
 				gPending.erase(std::remove_if(gPending.begin(), gPending.end(),
 					[now](auto const& p) { return p.second < now; }), gPending.end());
 				gPending.emplace_back(name, startTime + seconds);
+				scsynthSend(defRecv(def));
+				scsynthSend(oscBundle(startTime + seconds, {newSynth(name, 0), defFree(name)}, true));
 			}
-			scsynthSend(defRecv(def));
-			scsynthSend(oscBundle(startTime + seconds, {newSynth(name, 0), defFree(name)}, true));
 		}
 	} catch (...) {
 		post("ola : stopped; a voice failed\n");
@@ -167,7 +169,11 @@ void playTextures(Thread& th, Arg channels, double startTime, std::shared_ptr<Lo
 	}
 }
 
-void stopTextures() { ++gGeneration; }
+void stopTextures()
+{
+	std::lock_guard<std::mutex> lock(gPendingMutex);
+	++gGeneration;
+}
 
 void freePendingVoices()
 {
