@@ -4,14 +4,7 @@ clang builds different defs. The expected orders come from a clang build; CI's U
 
 import pytest
 
-from conftest import decode_scgf
-
-
-def graph(scgf: bytes) -> str:
-    def ref(x):
-        return f"{x[1]:g}" if x[0] == "c" else f"#{x[0]}.{x[1]}" if x[1] else f"#{x[0]}"
-    return " ".join(f"{name}{'/' + str(special) if special else ''}({','.join(ref(x) for x in inputs)})"
-                    for name, _, special, inputs, _ in decode_scgf(scgf)["ugens"])
+from conftest import graph
 
 
 ORDERS = {

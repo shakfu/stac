@@ -6,7 +6,7 @@ In order of priority within each section. Design records are in docs/dev/; this 
 
 ### Language
 
-- [ ] Check on a gcc build that the six examples of docs/dev/ssp.md task 2, e.g. `rocks on rails`, now write the same defs as clang. A scan for calls with two node-building arguments found six sites and fixed them; whether they cover all six examples is untested.
+- [ ] Confirm on CI that `tests/py/test_compilers.py` passes with `STAC_OTHER` set: gcc and clang builds write the same defs for all 155 examples in `examples/sapf.stac`, including the six of docs/dev/ssp.md task 2. Its first run will tell whether the six fixed sites cover them.
 
 - [ ] `stactool.py lint`: warn on a `def` without `-->` in a library file (docs/dev/stac.md, Proposal: unified definitions, open question 1).
 

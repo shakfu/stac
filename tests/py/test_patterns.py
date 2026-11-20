@@ -15,7 +15,7 @@ from nanosynth.osc import OscMessage
 
 import numpy as np
 
-from conftest import SAPF, SAPF_LIB, decode_scgf, read_wav_float, run_sapf
+from conftest import SAPF, SAPF_LIB, decode_scgf, read_wav_float, run_sapf, scgf_blobs
 
 SR = 96000  # sapf's default rate; run_sapf passes no -r
 
@@ -31,15 +31,6 @@ def unbundle(bundle):
         msg = OscMessage.from_datagram(bundle[i + 4:i + 4 + m])
         out.append((t, msg.address, list(msg.contents)))
         i += 4 + m
-    return out
-
-
-def scgf_blobs(data):
-    """The SCgf defs in OSC data, raw: nanosynth decodes an SCgf blob as a message."""
-    out, i = [], data.find(b"SCgf")
-    while i >= 0:
-        out.append(data[i:i + struct.unpack(">I", data[i - 4:i])[0]])
-        i = data.find(b"SCgf", i + 4)
     return out
 
 

@@ -57,12 +57,21 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
 
+      # A clang build of stac beside the gcc one, for test_compilers.py
+      - name: Build stac with clang
+        if: runner.os == 'Linux'
+        run: |
+          cmake -S . -B build-clang -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -Wno-dev
+          cmake --build build-clang --target stac --parallel
+
       - name: Run ctest
         run: ctest --test-dir build --output-on-failure
 
       # Tests that need an audio device skip themselves
       - name: Run pytest
         run: uv run pytest -q
+        env:
+          STAC_OTHER: ${{ runner.os == 'Linux' && format('{0}/build-clang/stac', github.workspace) || '' }}
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v7

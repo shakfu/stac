@@ -146,3 +146,20 @@ def decode_scgf(data: bytes) -> dict:
         ugens.append((uname, rate, special, inputs, outs))
     assert take("H") == 0 and pos == len(data)
     return {"name": name, "constants": constants, "defaults": defaults, "params": params, "ugens": ugens}
+
+
+def scgf_blobs(data: bytes) -> list[bytes]:
+    """The SCgf defs in OSC data, raw: nanosynth decodes an SCgf blob as a message."""
+    out, i = [], data.find(b"SCgf")
+    while i >= 0:
+        out.append(data[i:i + struct.unpack(">I", data[i - 4:i])[0]])
+        i = data.find(b"SCgf", i + 4)
+    return out
+
+
+def graph(scgf: bytes) -> str:
+    """A def's UGens in order, with their inputs; constants to 6 significant digits."""
+    def ref(x):
+        return f"{x[1]:g}" if x[0] == "c" else f"#{x[0]}.{x[1]}" if x[1] else f"#{x[0]}"
+    return " ".join(f"{name}{'/' + str(special) if special else ''}({','.join(ref(x) for x in inputs)})"
+                    for name, _, special, inputs, _ in decode_scgf(scgf)["ugens"])
