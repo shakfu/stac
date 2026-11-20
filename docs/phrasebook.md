@@ -10,7 +10,7 @@ Two instruments the pattern phrases play.
 
 ```stac-setup
 synthdef ping freq:440 amp:.1 gate:1 "a sine with a short attack, released by gate." [
-    freq sinosc  .005 .2 env.asr gate envgen.kr.done *  amp *  2 X
+    freq sinosc  .005 1 .2 env.asr gate envgen.kr.done *  amp *  2 X
 ]
 synthdef pad freq:220 amp:.1 gate:1 "a saw through a low-pass, adsr on gate." [
     freq saw 2000 .3 rlpf  .01 .2 .6 1 env.adsr gate envgen.kr.done *  amp *  2 X

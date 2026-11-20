@@ -5781,7 +5781,7 @@ Use it to hear a sound at once. For a sound you start many times, define a `synt
 ```stac
 [440 sinosc .1 *] play = n
 n.free
-synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 .1 env.asr gate envgen.kr.done * amp *]
+synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 1 .1 env.asr gate envgen.kr.done * amp *]
 {:instrument 'ping :midinote [60 64 67] cyc :dur .25} pbind play = p
 p.stop
 ```
@@ -5846,7 +5846,7 @@ import sc.clip
 
 `env.perc (attackTime releaseTime --> env)`
 
-Makes SC's `Env.perc`: rises to 1 over attackTime and falls to 0 over releaseTime, with curve -4.
+Makes SC's `Env.perc`: rises to level over attackTime and falls to 0 over releaseTime. A Form in place of the arguments names them and `level` and `curve`; SC's defaults fill the rest: attackTime .01, releaseTime 1, level 1, curve -4.
 
 Use it for a percussive note; `envgen.kr.done` frees the synth when it ends.
 
@@ -5858,26 +5858,26 @@ Use it for a percussive note; `envgen.kr.done` frees the synth when it ends.
 
 `env.adsr (attackTime decayTime sustainLevel releaseTime --> env)`
 
-Makes SC's `Env.adsr`: attack to 1, decay to sustainLevel, hold while the gate is open, then release to 0.
+Makes SC's `Env.adsr`: attack to peakLevel, decay to peakLevel * sustainLevel, hold while the gate is open, then release to 0; bias is added to every level. A Form in place of the arguments names them and `peakLevel`, `curve` and `bias`; SC's defaults fill the rest: .01 .3 .5 1, peakLevel 1, curve -4, bias 0.
 
 Use it for a held note that a `gate` control releases.
 
 ```stac
-synthdef pad freq:220 gate:1 [freq saw .01 .2 .6 1 env.adsr gate envgen.kr.done * .1 *]
+synthdef pad freq:220 gate:1 [freq saw {:decayTime .2 :sustainLevel .6} env.adsr gate envgen.kr.done * .1 *]
 {} pad = n
 n.release
 ```
 
 ### env.asr
 
-`env.asr (attackTime releaseTime --> env)`
+`env.asr (attackTime sustainLevel releaseTime --> env)`
 
-Makes SC's `Env.asr` with a sustain level of 1: attack, hold while the gate is open, release.
+Makes SC's `Env.asr`: attack to sustainLevel, hold while the gate is open, release. A Form in place of the arguments names them and `curve`; SC's defaults fill the rest: .01 1 1, curve -4.
 
 Use it for an organ-like note with no decay.
 
 ```stac
-synthdef organ freq:220 gate:1 [freq sinosc .01 .3 env.asr gate envgen.kr.done * .1 *]
+synthdef organ freq:220 gate:1 [freq sinosc .01 1 .3 env.asr gate envgen.kr.done * .1 *]
 {} organ = n
 n.release
 ```
@@ -5886,7 +5886,7 @@ n.release
 
 `env.linen (attackTime sustainTime releaseTime --> env)`
 
-Makes SC's `Env.linen`: linear attack to 1, hold for sustainTime, linear release.
+Makes SC's `Env.linen`: attack to level, hold for sustainTime, release, all linear. A Form in place of the arguments names them and `level` and `curve`; SC's defaults fill the rest: .01 1 1, level 1, curve `'lin`.
 
 Use it for a note of fixed length that ends on its own.
 
@@ -5944,7 +5944,7 @@ Makes a server group, as SC's `Group.new`. Its Form takes `:target` and `:addAct
 Use it to control a set of synths together, or to order effects after their sources.
 
 ```stac
-synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 .1 env.asr gate envgen.kr.done * amp *]
+synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 1 .1 env.asr gate envgen.kr.done * amp *]
 {} group.new = g
 {:target g} ping
 {:target g} ping
@@ -6086,7 +6086,7 @@ Makes an event stream from a Form of fields: a lazy list of events, one Form eac
 Use it for any sequence of notes, as SC's `Pbind`. `play` plays it; `pdef` makes it replaceable while it plays.
 
 ```stac
-synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 .1 env.asr gate envgen.kr.done * amp *]
+synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 1 .1 env.asr gate envgen.kr.done * amp *]
 {:instrument 'ping :degree [0 2 4 5 7] cyc :scale 'minor :dur .25} pbind play = p
 p.stop
 ```
@@ -6100,7 +6100,7 @@ Writes `name.osc`, an NRT command file of the first seconds of an event stream o
 Use it to render offline with scsynth, or to give the SSP's `scsy` a score.
 
 ```stac
-synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 .1 env.asr gate envgen.kr.done * amp *]
+synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 1 .1 env.asr gate envgen.kr.done * amp *]
 {:instrument 'ping :midinote [60 64] cyc :dur .5} pbind 2 "melody" score
 ```
 
@@ -6125,7 +6125,7 @@ Plays an event stream under a name, as SC's `Pdef`. Run again with the same name
 Use it to edit a pattern while it plays: change the line and run it again.
 
 ```stac
-synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 .1 env.asr gate envgen.kr.done * amp *]
+synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 1 .1 env.asr gate envgen.kr.done * amp *]
 {:instrument 'ping :midinote [60 62 64] cyc :dur .25} pbind 'mel pdef = p
 {:instrument 'ping :midinote [67 65] cyc :dur .25} pbind 'mel pdef
 p.stop
@@ -6157,7 +6157,7 @@ Makes a clock at tempo beats per second, as SC's `TempoClock`. `events clk.play`
 Use it to play patterns at a tempo other than the default 1 beat per second, or to change tempo live.
 
 ```stac
-synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 .1 env.asr gate envgen.kr.done * amp *]
+synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 1 .1 env.asr gate envgen.kr.done * amp *]
 2 clock.new = c
 {:instrument 'ping :dur 1} pbind c.play = p
 {:tempo 3} c.set

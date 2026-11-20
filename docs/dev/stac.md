@@ -781,13 +781,13 @@ An infinite list is an error; `1024 take` makes it finite. sapf-sc's silent 1024
 | `atk rel env.perc` | `Env.perc(atk, rel)` |
 | `a d s r env.adsr` | `Env.adsr(a, d, s, r)` |
 | `atk sus rel env.linen` | `Env.linen(atk, sus, rel)` |
-| `atk rel env.asr` | `Env.asr(atk, 1, rel)` |
+| `atk sus rel env.asr` | `Env.asr(atk, sus, rel)` |
 
 Each returns an `Env`; `envgen` flattens it into its inputs. Curves are reals or the symbols `'lin 'exp 'sin 'wel 'sqr 'cub 'step 'hold`.
 
 `N`, `T` and `NZ` on a `Sig` no longer end a synth. `.done` on an envelope or `line` does.
 
-Built: `env.perc`, `env.adsr`, `env.asr`, `env.linen` and `env.new`, with SC's defaults for the arguments they do not take: level 1, curve -4 (`linen`: `'lin`). `envgen` and `ienvgen` take an `Env`, or a list already in SC's envelope format. `.done` and `.kr` apply in either order.
+Built: `env.perc`, `env.adsr`, `env.asr`, `env.linen` and `env.new`, in SC's argument order. A stack word has a fixed arity, so the four shapes take only their times and sustain level from the stack; `level`, `peakLevel`, `curve` and `bias` take SC's defaults unless a Form names them, as a generated UGen's `tail` arguments do. `envgen` and `ienvgen` take an `Env`, or a list already in SC's envelope format. `.done` and `.kr` apply in either order.
 
 ## Completion
 

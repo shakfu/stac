@@ -24,7 +24,7 @@ def test_embedded_server_plays_a_file_to_its_end(tmp_path):
     assert 0.45 < elapsed < 10, elapsed
 
 
-PING = "synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .005 .05 env.asr gate envgen.kr.done * amp * 2 X]\n"
+PING = "synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .005 1 .05 env.asr gate envgen.kr.done * amp * 2 X]\n"
 
 
 @pytest.mark.parametrize("code", [

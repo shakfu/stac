@@ -50,7 +50,7 @@ reset
 
 ;;;; 4. SynthDefs, synths and controls
 
-synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .005 .2 env.asr gate envgen.kr.done * amp * 2 X]
+synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .005 1 .2 env.asr gate envgen.kr.done * amp * 2 X]
 synthdef pad freq:220 amp:.1 gate:1 [freq saw 2000 .3 rlpf .01 .2 .6 1 env.adsr gate envgen.kr.done * amp * 2 X]
 {:freq 660} ping = x                                ; start a synth with a control value
 {:freq 880} x.set                                   ; change it while it plays

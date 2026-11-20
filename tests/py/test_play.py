@@ -62,6 +62,13 @@ def test_play_starts_a_synth_and_stop_frees_it(server, sapf):
     assert synths(server) == 0
 
 
+def test_a_second_process_does_not_reuse_play_node_ids(server, sapf):
+    # each run is a new process; with a fixed ID sequence the second /s_new hit a duplicate node
+    assert "error" not in sapf("440 0 sinosc 0 * play")
+    assert "error" not in sapf("440 0 sinosc 0 * play")
+    assert synths(server) == 2
+
+
 def test_reset_frees_synths_and_clears_the_stack(server, sapf):
     out = sapf("440 0 sinosc 0 * stac.play stackDepth pr cr reset stackDepth pr cr")
     assert "error" not in out, out
@@ -153,7 +160,7 @@ def control(node, name):
 
 
 TONE = "synthdef tone amp:0 freq:440 [freq sc.sinosc amp *]\n"
-GATED = "synthdef gated amp:0 gate:1 [300 sc.sinosc .01 .3 env.asr gate sc.envgen.kr.done * amp *]\n"
+GATED = "synthdef gated amp:0 gate:1 [300 sc.sinosc .01 1 .3 env.asr gate sc.envgen.kr.done * amp *]\n"
 
 
 def test_def_starts_a_synth_with_controls(server, sapf):

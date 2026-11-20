@@ -4,6 +4,7 @@
 
 ### Changed
 
+- `env.asr` takes SC's `(attackTime sustainLevel releaseTime)`: `.01 1 .3 env.asr`. It took `(attackTime releaseTime)` with the level fixed at 1, so an sclang argument list such as `.01 .5 1` bound .5 as the attack and left .01 on the stack.
 - The binary is `stac`, and its environment variables are `STAC_*`: `STAC_SCSYNTH`, `STAC_SYNTHDEFS`, `STAC_RECORDINGS`, `STAC_PRELUDE` and the rest. `sapf-prelude.txt` is `prelude.stac`; `sapf-examples.txt` is `examples/sapf.stac`. Phase 1 of `docs/dev/stac.md`. The `SAPF_` names are not read; rename them in your shell.
 - sapf's DSP words, `kr`, `ctl`, `>sd`, `>sf`, `>sfo`, `>nrt`, `ola`, `ramp` and the `ola` event-list words `evmerge`, `evdelay` and `evrest` are in the namespace `sapf`, not the core: `440 0 sapf.sinosc`. `prelude.stac` imports SC's UGens in their place, with SC's arguments: `440 sinosc` is `SinOsc.ar(440)`. `sapf.stac` imports the sapf words over them and holds the 48 prelude definitions built on them. Run sapf programs with `-p prelude.stac -p sapf.stac`; `-p` now repeats. Phase 5 of `docs/dev/stac.md`. The C++ stays; rewriting the words in stac would change output that 108 conformance cases check (`docs/dev/stac-phase5.md`).
 
@@ -85,8 +86,13 @@
   uv run python scripts/stactool.py lint [--prelude prelude.stac] FILE...
   ```
 
+- `env.perc`, `env.adsr`, `env.asr` and `env.linen` take a Form of SC's arguments by name, as the generated UGen words do; a missing argument takes SC's default. The Form also reaches `level`, `peakLevel`, `curve` and `bias`, which the stack form leaves at their defaults: `{:sustainLevel .6 :curve -8} env.adsr`.
+- A file run without `-i` warns when values are left on the stack at its end. A missing argument otherwise passes silently: a dropped `osc` made `>nrt` write a score of the wrong value. The warning is at the end of the run, not in `>nrt`, because the REPL keeps values on the stack on purpose.
+
 ### Fixed
 
+- A def's UGen order, and so its bytes, could differ between gcc and clang builds. Six graph helpers, for `bpf`, `bsf`, `lpf1`, `hpf1`, the 12 dB filters, the `comb` words, `line` and the end gate of a finite signal, built two nodes inside one call's arguments, whose evaluation order C++ leaves unspecified; node creation order breaks ties in the topological sort. `trirand` and `itrirand` subtracted two draws in one expression, so a build could mirror the result. Each now builds in its own statement, in the order clang used, so clang's defs are unchanged. `tests/py/test_graph_order.py` pins the orders; CI's Ubuntu job runs it under gcc.
+- `play` took node IDs from 2000001 in a fixed sequence, so a second or restarted stac on the same server reused the IDs of synths still running, and its `/s_new` failed. It now takes them from the process's own block, as `synthdef` synths and patterns do.
 - `play` refuses a channel that is a constant outside -1..1: `[440 0 sinosc .1 *] play` under `prelude.stac` sent DC 440 to channel 0, which the DAC clips to full-scale DC. An error over clipping, which keeps the DC, or a warning, which still plays it. Constants within -1..1 still play, as CV on DC-coupled outputs such as the SSP's.
 - A UGen with no outputs, such as `out`, `localout` or `sendtrig`, in a plain `[...] play` list was dropped from the graph; only a `synthdef` body kept it. Such a UGen now returns a `Root`, printed `<LocalOut>`, which `play`, `>sd`, `>sf` and `ndef` make a root of the graph. A `Root` is not a signal, so arithmetic on it fails; `pop` still drops it. The value carries the root, over a collector per REPL line, which would lose a root bound on one line and played on the next. A `synthdef` body that leaves only Roots no longer gets an `out` control.
 - `"a""b"` failed to parse: a doubled quote ended the string after adding the quote. It is now the string `a"b`. Upstream sapf has the same bug ([docs/dev/upstream-sapf-bugs.md](docs/dev/upstream-sapf-bugs.md)).

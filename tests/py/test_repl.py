@@ -10,7 +10,7 @@ import time
 
 import pytest
 
-from conftest import SAPF
+from conftest import SAPF, run_sapf
 
 pty = pytest.importorskip("pty")
 
@@ -70,3 +70,9 @@ def test_files_when_named(sapf_bin, tmp_path):
     subprocess.run([str(SAPF), "-q"], input="1 2 +\nquit\n", capture_output=True, text=True, env=env, timeout=30)
     assert "1 2 +" in (tmp_path / "h").read_text()
     assert "1 2 +" in (tmp_path / "l").read_text()
+
+
+def test_file_run_warns_of_values_left_on_the_stack(sapf_bin, tmp_path):
+    assert "2 values left on the stack" in run_sapf("1 2", tmp_path, [])
+    assert "left on the stack" not in run_sapf("1 2 + pop", tmp_path, [])
+    assert "left on the stack" not in run_sapf("1 2 nosuchword", tmp_path, [])  # the error says enough

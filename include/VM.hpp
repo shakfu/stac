@@ -608,7 +608,8 @@ public:
 
 
 uint64_t timeseed();
-void loadFile(Thread& th, const char* filename);
+// Runs a file. False if it could not be opened or compiled, or failed with an error.
+bool loadFile(Thread& th, const char* filename);
 
 
 class UseRate

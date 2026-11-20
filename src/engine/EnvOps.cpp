@@ -9,6 +9,7 @@
 // (SCClassLibrary/Common/Audio/Env.sc).
 
 #include "Env.hpp"
+#include "Def.hpp"
 #include "Graph.hpp"
 #include "Namespace.hpp"
 #include <cstring>
@@ -75,6 +76,9 @@ std::vector<V> Env::interpolationArray(Thread& th, const char* msg) const
 	return a;
 }
 
+extern BinaryOp* gBinaryOpPtr_plus;
+extern BinaryOp* gBinaryOpPtr_mul;
+
 namespace {
 
 // A level, time or curvature: a real, a UGen, or a list of them for several channels.
@@ -120,35 +124,64 @@ void pushEnv(Thread& th, std::vector<V> levels, std::vector<V> times, std::vecto
 	th.push(V(env));
 }
 
+// a op b, packed; a real identity operand returns the other, as sclang's BinaryOpUGen does
+V arith(Thread& th, BinaryOp* op, double identity, V a, Arg b)
+{
+	if (b.isReal() && b.f == identity) return a;
+	if (a.isReal() && a.f == identity) return b;
+	V v = a.binaryOp(th, op, b);
+	return v.isList() ? V(((List*)v.o())->pack(th)) : v;
+}
+
+// One or more curves, wrapped per segment.
+std::vector<V> popCurves(Thread& th, const char* msg)
+{
+	std::vector<V> cs = items(th, popCurve(th, msg));
+	for (Arg c : cs)
+		if (c.isString()) shapeNumber(c, msg);
+	return cs;
+}
+
 void perc_(Thread& th, Prim* prim)
 {
+	std::vector<V> curve = popCurves(th, "env.perc : curve");
+	V level = popPoint(th, "env.perc : level");
 	V rel = popPoint(th, "env.perc : releaseTime");
 	V atk = popPoint(th, "env.perc : attackTime");
-	pushEnv(th, {0., 1., 0.}, {atk, rel}, {-4.});
+	pushEnv(th, {0., level, 0.}, {atk, rel}, curve);
 }
 
 void adsr_(Thread& th, Prim* prim)
 {
+	V bias = popPoint(th, "env.adsr : bias");
+	std::vector<V> curve = popCurves(th, "env.adsr : curve");
+	V peak = popPoint(th, "env.adsr : peakLevel");
 	V rel = popPoint(th, "env.adsr : releaseTime");
 	V sus = popPoint(th, "env.adsr : sustainLevel");
 	V dec = popPoint(th, "env.adsr : decayTime");
 	V atk = popPoint(th, "env.adsr : attackTime");
-	pushEnv(th, {0., 1., sus, 0.}, {atk, dec, rel}, {-4.}, 2.);
+	std::vector<V> levels = {0., peak, arith(th, gBinaryOpPtr_mul, 1., peak, sus), 0.};
+	for (V& l : levels) l = arith(th, gBinaryOpPtr_plus, 0., l, bias);
+	pushEnv(th, levels, {atk, dec, rel}, curve, 2.);
 }
 
 void asr_(Thread& th, Prim* prim)
 {
+	std::vector<V> curve = popCurves(th, "env.asr : curve");
 	V rel = popPoint(th, "env.asr : releaseTime");
+	V sus = popPoint(th, "env.asr : sustainLevel");
 	V atk = popPoint(th, "env.asr : attackTime");
-	pushEnv(th, {0., 1., 0.}, {atk, rel}, {-4.}, 1.);
+	pushEnv(th, {0., sus, 0.}, {atk, rel}, curve, 1.);
 }
 
 void linen_(Thread& th, Prim* prim)
 {
+	std::vector<V> curve = popCurves(th, "env.linen : curve");
+	V level = popPoint(th, "env.linen : level");
 	V rel = popPoint(th, "env.linen : releaseTime");
 	V sus = popPoint(th, "env.linen : sustainTime");
 	V atk = popPoint(th, "env.linen : attackTime");
-	pushEnv(th, {0., 1., 1., 0.}, {atk, sus, rel}, {V(getsym("lin"))});
+	pushEnv(th, {0., level, level, 0.}, {atk, sus, rel}, curve);
 }
 
 // SC's Env.new: times wrap to one per segment; curves wrap per segment when read.
@@ -169,6 +202,50 @@ void new_(Thread& th, Prim* prim)
 	pushEnv(th, ls, segs, cs);
 }
 
+struct EnvParam { const char* name; V def; };
+
+// An env constructor in SC's argument order. It takes the leading shape arguments from the stack
+// and the rest, such as curve, at SC's defaults; a Form in their place names any of them.
+class EnvPrim : public Prim
+{
+	std::vector<EnvParam> mParams;
+	std::string mWord;
+public:
+	EnvPrim(const char* word, PrimFun fun, int positional, std::vector<EnvParam> params, const char* help)
+		: Prim(fun, 0., (uint16_t)positional, 1, word, help), mParams(std::move(params)),
+		  mWord(std::string("env.") + word) {}
+
+	virtual void apply(Thread& th) override
+	{
+		if (th.stackDepth() >= 1 && th.top().isForm()) {
+			V form = th.pop();
+			for (auto& [key, v] : formPairs(th, (Form*)form.o())) {
+				bool known = false;
+				for (auto& p : mParams) known |= key == p.name;
+				if (!known) {
+					post("%s : no argument named %s\n", mWord.c_str(), key.c_str());
+					throw errNotFound;
+				}
+			}
+			for (auto& p : mParams) {
+				V v;
+				th.push(((Form*)form.o())->get(th, V(getsym(p.name)), v) ? v : p.def);
+			}
+		} else {
+			if (th.stackDepth() < mTakes) throw errStackUnderflow;
+			for (size_t i = mTakes; i < mParams.size(); ++i) th.push(mParams[i].def);
+		}
+		apply_n(th, mParams.size());
+	}
+};
+
+void addEnvPrim(Namespace* ns, const char* word, PrimFun fun, int positional, std::vector<EnvParam> params,
+	const char* help)
+{
+	ns->mWords[word] = V(new EnvPrim(word, fun, positional, std::move(params), help));
+	vm.addBifHelp((ns->mName + "." + word).c_str(), nullptr, help);
+}
+
 } // namespace
 
 void AddEnvOps();
@@ -176,11 +253,21 @@ void AddEnvOps()
 {
 	vm.addBifHelp(std::string("\n*** env ***"));
 	P<Namespace> env = new Namespace("env");
-	env->addPrim("perc", 2, perc_, "(attackTime releaseTime --> env) SC's Env.perc: rises to 1, falls to 0, curve -4.");
-	env->addPrim("adsr", 4, adsr_,
-		"(attackTime decayTime sustainLevel releaseTime --> env) SC's Env.adsr: holds sustainLevel until the gate closes.");
-	env->addPrim("asr", 2, asr_, "(attackTime releaseTime --> env) SC's Env.asr: holds 1 until the gate closes.");
-	env->addPrim("linen", 3, linen_, "(attackTime sustainTime releaseTime --> env) SC's Env.linen: linear, holds 1.");
+	// SC's argument names, order and defaults (Env.sc)
+	const V lin = V(getsym("lin"));
+	addEnvPrim(env.get(), "perc", perc_, 2,
+		{{"attackTime", .01}, {"releaseTime", 1.}, {"level", 1.}, {"curve", -4.}},
+		"(attackTime releaseTime --> env) SC's Env.perc: rises to level, falls to 0. A Form names these and level, curve.");
+	addEnvPrim(env.get(), "adsr", adsr_, 4,
+		{{"attackTime", .01}, {"decayTime", .3}, {"sustainLevel", .5}, {"releaseTime", 1.}, {"peakLevel", 1.},
+			{"curve", -4.}, {"bias", 0.}},
+		"(attackTime decayTime sustainLevel releaseTime --> env) SC's Env.adsr: holds peakLevel * sustainLevel until the gate closes. A Form names these and peakLevel, curve, bias.");
+	addEnvPrim(env.get(), "asr", asr_, 3,
+		{{"attackTime", .01}, {"sustainLevel", 1.}, {"releaseTime", 1.}, {"curve", -4.}},
+		"(attackTime sustainLevel releaseTime --> env) SC's Env.asr: holds sustainLevel until the gate closes. A Form names these and curve.");
+	addEnvPrim(env.get(), "linen", linen_, 3,
+		{{"attackTime", .01}, {"sustainTime", 1.}, {"releaseTime", 1.}, {"level", 1.}, {"curve", lin}},
+		"(attackTime sustainTime releaseTime --> env) SC's Env.linen: holds level for sustainTime. A Form names these and level, curve.");
 	env->addPrim("new", 3, new_,
 		"(levels times curves --> env) SC's Env.new. curves: a real, a UGen, a shape such as 'lin 'exp 'sin, or a list.");
 	vm.def("env", V(env));

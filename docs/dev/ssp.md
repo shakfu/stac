@@ -16,7 +16,7 @@ State as of 2026-10-14, on the Linux machine, ../ssp branch `sapf` (`c1290dd`).
 
 - Device test (2026-10-14): three files play on the SSP in scsy built from `c1290dd`. `sapftex.osc` (`ola` klank texture, 20 s), `sapfosc.osc` (`sawTbl osc`, 30 wave-table buffers, 1.2 MB), and `sapfloop.scsyndef` with sidecar `// @buf 0 loop.wav`.
 
-- `>nrt` writes a score when values are left on the stack, without a warning. A typo dropped `osc` from a test score this way.
+- `>nrt` wrote a score when values were left on the stack, without a warning. A typo dropped `osc` from a test score this way. A file run now warns of values left on its stack.
 
 - Sample scaling: 1.0 is +5 V, so -1..1 spans the outputs' -5..+5 V. Percussa's SDK does not state it; TheTechnobear's DATA plugin displays volts as sample x 5 (`technobear/data/Source/PluginEditor.cpp:226`) and reads 1 V/oct as 0.2 per octave (`technobear/common/SSP.h:37`), in github.com/TheTechnobear/SSP `20ea8c5`. `play`'s DC check uses this bound.
 
@@ -24,7 +24,7 @@ State as of 2026-10-14, on the Linux machine, ../ssp branch `sapf` (`c1290dd`).
 
 1. A `sapf` SSP plugin for live coding: the interpreter with its own `ScWorld`, ttyp's keyboard input, a multi-line editor, the prelude loaded at start. Design: ../ssp docs/dev/sapf-plugin.md. Step 1 (the interpreter on the SSP) passed 2026-10-14. Its sapf-sc changes: `SAPF_REPLXX` (CMake option, default ON), and `Array::setSize`/`addSize` taking `int64_t`: as `size_t`, `Gen::produce`'s negative delta became 2^32 - k on 32-bit ARM and crashed every list operation. Steps 2 and 4 still need `ScsynthServer::now()`, a `post` hook and an interrupt flag.
 
-2. Compiler-dependent graphs: with the same seed, gcc and clang builds write different defs for six examples (e.g. `rocks on rails`): UGen order and random draws follow function argument evaluation order, which C++ leaves unspecified. That cause is inferred from gcc vs clang; the code is not located yet.
+2. Compiler-dependent graphs: with the same seed, gcc and clang builds write different defs for six examples (e.g. `rocks on rails`): UGen order and random draws follow function argument evaluation order, which C++ leaves unspecified. Six such sites in `SCUGens.cpp`, and two in `rgen.hpp`, were found by a scan and fixed (CHANGELOG, Fixed). Not yet re-checked on a gcc build against these examples.
 
 ## Known differences from sapf
 

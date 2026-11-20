@@ -29,7 +29,7 @@ inline const char* symbolOf(Arg v) { return v.isString() ? ((String*)v.o())->s :
 // The key and value pairs of a Form, its own and inherited.
 std::vector<std::pair<std::string, V>> formPairs(Thread& th, Form* form);
 
-// A node ID from this process's block of 100000, above play's 2000000.. and sclang's 1000.., so a
+// A node ID from this process's block of 100000, above sclang's 1000.., so a
 // second sapf on the same server, or a restarted one, does not reuse the IDs of synths still running.
 int newNodeID();
 

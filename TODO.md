@@ -6,9 +6,9 @@ In order of priority within each section. Design records are in docs/dev/; this 
 
 ### Language
 
-- [ ] `stactool.py lint`: warn on a `def` without `-->` in a library file (docs/dev/stac.md, Proposal: unified definitions, open question 1).
+- [ ] Check on a gcc build that the six examples of docs/dev/ssp.md task 2, e.g. `rocks on rails`, now write the same defs as clang. A scan for calls with two node-building arguments found six sites and fixed them; whether they cover all six examples is untested.
 
-- [ ] `env.perc`, `env.adsr`, `env.asr` and `env.linen` take positional arguments only. Accept a keyword Form, as the generated UGen words do: `.01 .2 .6 1 env.adsr` is the line in a def that most needs naming.
+- [ ] `stactool.py lint`: warn on a `def` without `-->` in a library file (docs/dev/stac.md, Proposal: unified definitions, open question 1).
 
 - [ ] `sapf.stac`'s 46 definitions are still lambdas. Convert them to typed `def`s as `std.stac` was, or record why not.
 
@@ -58,8 +58,6 @@ In order of priority within each section. Design records are in docs/dev/; this 
 - [ ] Revisit `where` once modules have been used: helpers private to one definition may still clutter a module (docs/dev/stac.md and the discussion of 2026-10-16).
 
 - [ ] A redefined word adds a second help line; `helpall` lists both, though `--words` keeps the last.
-
-- [ ] `play` takes node IDs from 2000000 in a fixed sequence, so a restarted stac can reuse the IDs of synths still running. `newNodeID` already gives each process its own block; use it for `play` too.
 
 - [ ] `ola` voices start on the 64-frame block holding their time. `OffsetOut` would place them on the frame but crashed nanosynth's NRT renderer (`world_nrt_render`); find out why.
 

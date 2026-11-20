@@ -1,10 +1,10 @@
 # Next steps
 
-State as of 2026-10-16. Committed up to a0608a9; everything since is uncommitted: phases 1-5 of stac.md, the gaps after them, the naming stage (source namespaces and `import`), modules, late binding, `def`/`synthdef`/`const`, the dictionary, the phrasebook and the README rewrite. ../ssp's state and tasks are in docs/dev/ssp.md.
+State as of 2026-11-20, at ea18b2a and the working tree. ../ssp's state and tasks are in docs/dev/ssp.md.
 
 ## State
 
-- `make test` passes on macOS: 282 ctest; 1017 pytest passed, 112 skipped. Linux last passed on 2026-10-14, before phase 5.
+- `make test` passes on macOS: 306 ctest; 1067 pytest passed, 112 skipped. CI (`.github/workflows/build.yml`) builds and tests on macOS and Ubuntu each push; it last passed at ea18b2a.
 
 - docs/dictionary/ has an entry for every word, 1330 in all, and docs/phrasebook.md 31 phrases; the tests run every example in both and in the README.
 

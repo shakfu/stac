@@ -24,7 +24,7 @@ Every example in both runs in the test suite.
 [[440 442] sinosc .1 *] play                       ; stereo: a list of frequencies is a list of channels
 stop                                                ; frees every synth and stops every pattern
 
-synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .005 .2 env.asr gate envgen.kr.done * amp * 2 X]
+synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .005 1 .2 env.asr gate envgen.kr.done * amp * 2 X]
 {:freq 660} ping = x                                ; start a synth, keep its node
 {:freq 880} x.set
 x.release

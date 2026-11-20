@@ -266,7 +266,10 @@ static V octavesToRQ(Thread& th, Arg bw)
 {
 	if (bw.isReal()) return exp2(bw.f * .5) - exp2(-bw.f * .5);
 	V half = mul(th, bw, .5);
-	return graphBinary(th, opSub, graphBinary(th, opPow, 2., half), graphBinary(th, opPow, 2., graphUnary(th, opNeg, half)));
+	// each node built in its own statement: argument evaluation order is unspecified, and node order is the def's
+	V up = graphBinary(th, opPow, 2., half);
+	V down = graphBinary(th, opPow, 2., graphUnary(th, opNeg, half));
+	return graphBinary(th, opSub, up, down);
 }
 
 static void bpf_(Thread& th, Prim* prim)
@@ -377,7 +380,8 @@ static void decay2_(Thread& th, Prim* prim)
 // sapf's first-order filters: a1 = b - sqrt(b^2 - 1) with b = 2 - cos(w). FOS takes the coefficients.
 static V firstOrderCoeff(Thread& th, Arg freq)
 {
-	V w = graphBinary(th, opFDiv, mul(th, freq, kTwoPi), makeUGen("SampleRate", rateIR, {}));
+	V radians = mul(th, freq, kTwoPi);
+	V w = graphBinary(th, opFDiv, radians, makeUGen("SampleRate", rateIR, {}));
 	V b = graphBinary(th, opSub, 2., graphUnary(th, opCos, w));
 	return graphBinary(th, opSub, b, graphUnary(th, opSqrt, graphBinary(th, opSub, mul(th, b, b), 1.)));
 }
@@ -415,7 +419,8 @@ struct Biquad {
 // sapf's 24 dB/oct filters run the same biquad twice. alpha is sin(w) times alphaScale.
 static Biquad rbj(Thread& th, Arg freq, Arg alphaScale, bool high)
 {
-	V w = graphBinary(th, opFDiv, mul(th, freq, kTwoPi), makeUGen("SampleRate", rateIR, {}));
+	V radians = mul(th, freq, kTwoPi);
+	V w = graphBinary(th, opFDiv, radians, makeUGen("SampleRate", rateIR, {}));
 	V cs = graphUnary(th, opCos, w);
 	V alpha = mul(th, graphUnary(th, opSin, w), alphaScale);
 	V b1 = high ? graphBinary(th, opSub, -1., cs) : graphBinary(th, opSub, 1., cs);
@@ -480,7 +485,8 @@ static V feedback(Thread& th, Arg delay, Arg decay)
 	}
 	V ratio = graphBinary(th, opFDiv, delay, decay);
 	V exponent = graphBinary(th, opMin, graphUnary(th, opAbs, ratio), 2.);
-	return mul(th, graphUnary(th, opSign, ratio), graphBinary(th, opPow, .001, exponent));
+	V sign = graphUnary(th, opSign, ratio);
+	return mul(th, sign, graphBinary(th, opPow, .001, exponent));
 }
 
 static void comb(Thread& th, const char* name, const char* ugen)
@@ -659,7 +665,8 @@ static V envGen(std::vector<double> levels, std::vector<V> times, int shape, int
 // EnvGen rounds its segment time up to whole samples, so it gets half a sample less.
 V endAfter(Thread& th, Arg in, Arg frames)
 {
-	V seconds = mul(th, graphBinary(th, opSub, frames, .5), makeUGen("SampleDur", rateIR, {}));
+	V last = graphBinary(th, opSub, frames, .5);
+	V seconds = mul(th, last, makeUGen("SampleDur", rateIR, {}));
 	V gate = envGen({1., 1., 0.}, {seconds, 0.}, shapeLinear, 2);
 	((Sig*)gate.o())->node->endGate = true;
 	return mul(th, in, gate);
@@ -725,7 +732,8 @@ static void line_(Thread& th, Prim* prim)
 	double end = th.popFloat("line : end");
 	double start = th.popFloat("line : start");
 	double dur = th.popFloat("line : dur");
-	th.push(endAfter(th, makeUGen("Line", rateAR, {start, end, dur, 0.}), secondsToFrames(th, dur)));
+	V line = makeUGen("Line", rateAR, {start, end, dur, 0.});
+	th.push(endAfter(th, line, secondsToFrames(th, dur)));
 }
 
 // Across zero sapf cubes a linear ramp between cube roots, which XLine cannot do.
@@ -1029,9 +1037,8 @@ static void play_(Thread& th, Prim* prim)
 	}
 	std::string name = "sapf-play-" + std::to_string(++gPlayCount);
 	std::string def = compileSynthDef(th, channels, name);
-	// at the tail of the root group, after any ola voices it reads; its ola voices stop when it
-	// ends, so it has a node ID of its own, above the 1000.. sclang uses
-	const int node = 2000000 + gPlayCount;
+	// at the tail of the root group, after any ola voices it reads; its ola voices stop when it ends
+	const int node = newNodeID();
 	std::string snew = oscMessage("/s_new", {{OscArg::String, 0, name}, {OscArg::Int, node, ""},
 		{OscArg::Int, 1, ""}, {OscArg::Int, 0, ""}});
 	auto loaded = std::make_shared<LoadedTables>();

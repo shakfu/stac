@@ -54,9 +54,13 @@ int main(int argc, const char * argv[])
 	}
 
 	if (!inputFile.empty()) {
-		loadFile(th, inputFile.c_str());
+		bool ran = loadFile(th, inputFile.c_str());
 
 		if (!interactive) {
+			// usually a missing argument: a word such as >nrt took the wrong value and left the rest
+			if (size_t n = ran ? th.stackDepth() : 0)
+				post("warning: %zu value%s left on the stack at the end of '%s'\n", n, n == 1 ? "" : "s",
+					inputFile.c_str());
 #ifdef SAPF_EMBED_SCSYNTH
 			waitForEmbeddedScsynth();  // what the file plays, until it ends
 #endif

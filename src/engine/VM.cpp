@@ -631,14 +631,14 @@ public:
 	T* operator->() { return p; }
 };
 
-void loadFile(Thread& th, const char* filename)
+bool loadFile(Thread& th, const char* filename)
 {
     post("loading file '%s'\n", filename);
 	LoadingFile loading(filename);
 	FILE* f = fopen(filename, "r");
 	if (!f) {
 		post("could not open '%s'\n", filename);
-		return;
+		return false;
 	}
 
 	fseek(f, 0, SEEK_END);
@@ -657,6 +657,7 @@ void loadFile(Thread& th, const char* filename)
 				compiledFun->run(th);
 				th.publishWorkspace();
 				post("done loading file\n");
+				return true;
 			}
 		}
     } catch (V& v) {
@@ -677,6 +678,7 @@ void loadFile(Thread& th, const char* filename)
 		th.flushBacktrace();
 		post("unknown error\n");
 	}
+	return false;
 }
 
 void Thread::printStack()

@@ -159,7 +159,8 @@ inline double RGen::linrand(double lo, double hi)
 
 inline double RGen::trirand(double lo, double hi)
 {
-	return lo + (hi - lo) * (.5 + .5 * (drand() - drand()));
+	double a = drand();  // separate statements: the order of operands' evaluation is unspecified
+	return lo + (hi - lo) * (.5 + .5 * (a - drand()));
 }
 
 inline double RGen::coin(double p)
@@ -191,7 +192,8 @@ inline int64_t RGen::ilinrand(int64_t lo, int64_t hi)
 inline int64_t RGen::itrirand(int64_t lo, int64_t hi)
 {
 	double scale = (double)(hi - lo);
-	return lo + (int64_t)floor(scale * (.5 + .5 * (drand() - drand())));
+	double a = drand();
+	return lo + (int64_t)floor(scale * (.5 + .5 * (a - drand())));
 }
 
 #endif

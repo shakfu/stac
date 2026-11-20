@@ -357,7 +357,7 @@ Clock: `events name clk.pdef` plays a pdef on that clock, replacing the named st
 Use it to keep a pattern in time with a clock other than the default.
 
 ```stac
-synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 .1 env.asr gate envgen.kr.done * amp *]
+synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 1 .1 env.asr gate envgen.kr.done * amp *]
 4 clock.new = c
 {:instrument 'ping :dur 1} pbind 'beat c.pdef = p
 p.stop
@@ -372,7 +372,7 @@ Clock: `events clk.play` plays an event stream on the clock. Ndef: starts the mo
 Use it on a clock to play at its tempo; on an ndef to hear it again.
 
 ```stac
-synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 .1 env.asr gate envgen.kr.done * amp *]
+synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 1 .1 env.asr gate envgen.kr.done * amp *]
 2 clock.new = c
 {:instrument 'ping :dur 1} pbind c.play = p
 p.stop
@@ -442,7 +442,7 @@ Player: ends the event stream. Ndef: fades out the monitor; the synth keeps runn
 Use it to stop a pattern, or to silence an ndef that another ndef still reads.
 
 ```stac
-synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 .1 env.asr gate envgen.kr.done * amp *]
+synthdef ping freq:440 amp:.1 gate:1 [freq sinosc .01 1 .1 env.asr gate envgen.kr.done * amp *]
 {:instrument 'ping :dur .25} pbind play = p
 p.stop
 ```

@@ -178,7 +178,7 @@ void checkPlay(int port, AudioThread& audio, const std::string& label)
 	check(audio.peak() > 0.09f && audio.peak() < 0.11f, (label + ": plays sine at 0.1").c_str());
 	checkStop(port, audio, label);
 
-	udpEval(port, "synthdef ping freq:440 amp:.1 gate:1 [freq sc.sinosc .005 .2 env.asr gate envgen.kr.done * amp *]");
+	udpEval(port, "synthdef ping freq:440 amp:.1 gate:1 [freq sc.sinosc .005 1 .2 env.asr gate envgen.kr.done * amp *]");
 	audio.resetPeak();
 	reply = udpEval(port, "{:instrument 'ping :midinote [69] cyc :dur .25} pbind play clear");
 	const int64_t replied = audio.frames();
