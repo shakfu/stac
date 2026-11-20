@@ -32,8 +32,8 @@ public:
     int32_t hash;
     String* nextSymbol;
 
-    String(const char* str, int32_t inHash, String* nextSymbol = nullptr)
-        : Object(), nextSymbol(nextSymbol)
+    String(const char* str, int32_t inHash, String* inNextSymbol = nullptr)
+        : Object(), nextSymbol(inNextSymbol)
     {
         s = strdup(str);
         hash = inHash;

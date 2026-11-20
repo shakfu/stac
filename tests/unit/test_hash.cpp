@@ -8,6 +8,7 @@
 
 #include <gtest/gtest.h>
 #include "Hash.hpp"
+#include <algorithm>
 #include <string>
 #include <set>
 #include <vector>
