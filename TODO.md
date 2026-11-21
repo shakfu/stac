@@ -18,6 +18,7 @@ In order of priority within each section. Design records are in docs/dev/; this 
 
 - [ ] The 19 SC classes not generated (docs/dev/stac.md, phase 2; reasons in `spec/stac-ugens.json`). `Splay` and `DynKlank` first: SC pieces use them most.
   - sclang code that emits other UGens: `Changed`, `CompanderD`, `HilbertFIR`, `VarLag`, `Splay`, `SplayAz`, `DynKlank`, `DynKlang`, `Dunique`, `LocalBuf`, `Tap`, `UnpackFFT`, `InBus`; `Dstutter` is a deprecated alias of `Ddup`.
+
   - strings or other objects as arguments: `Poll`, `Dpoll`, `SendReply`, `SendPeakRMS`, `InRect`.
 
 - [ ] `sc3p`: sc3-plugins' UGens. Needs a spec in `sclang-reference.json`'s format, from sclang with the plugins installed, and the plugin binaries in the embedded scsynth and on the SSP (docs/dev/stac.md, Proposal: canonical namespaces and import).
@@ -30,9 +31,13 @@ In order of priority within each section. Design records are in docs/dev/; this 
 
 - [ ] `>sd` and `.write`: write the SSP `scsy` sidecar's `@p` lines alongside `name.scsyndef`.
   - Format, from `../ssp/plugins/scsynth/README.md`: `name.txt` beside `name.scsyndef`, lines `// @p1 cutoff 20 20000 Hz log cv 3` (slot, control name, min, max, unit, curve, CV input).
+
   - Without a sidecar, `scsy` maps `p1`..`p16` to the first 16 controls in def order, each ranged 0 to max(1, 2 x default). A sidecar is needed only for ranges, units, curves, CV or another slot order.
+
   - Open: where min, max and curve come from. Neither `ctl` nor a `synthdef` control declares them.
+
   - Open: slot order. `synthdef` keeps declaration order; `>sd` sorts parameters by name.
+
   - Note: a label that names no control fails the load in `scsy`, and `freq`, `velocity` and `gate` are reserved for MIDI.
 
 - [ ] `stop` against a remote scsynth can let an `ola` voice start after it. Voice sends and `/clearSched` rely on packets arriving in send order, which holds for the embedded server and loopback, not across a network. One option: voices in a group that `stop` frees, so a late `/s_new` finds no target.

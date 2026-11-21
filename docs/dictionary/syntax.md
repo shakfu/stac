@@ -76,6 +76,16 @@ x x *          ;-> 9
 c b a          ;-> 3 2 1
 ```
 
+In a function, `=` is a sequential, non-recursive `let`, as Scheme's `let*`, not Haskell's `where`:
+
+| | `=` in a function | Haskell `where` | Scheme `let*` |
+|-|-|-|-|
+| Use before the binding | undefined word | allowed | unbound |
+| A lambda calling its own name | undefined word | allowed | needs `letrec` |
+| Scope | to the end of the function body, past any `]` | the whole equation | the `let*` body |
+| Same name bound twice | the later value from then on | error | the later value |
+| A lambda's view of a later rebinding | keeps the value it was made with | not applicable | keeps the value |
+
 ### \
 
 `\`

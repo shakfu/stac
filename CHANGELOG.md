@@ -5,24 +5,32 @@
 ### Changed
 
 - `sapf.stac`'s 46 definitions are typed `def`s, as `std.stac`'s are: each call checks it leaves one signal, or two for the `crossover` words. Their stack effects are generated, e.g. `lfo (freq phase lo hi --> sig)`, over the hand-written ones the help strings carried. `adsrenv` gained a help line, so it is now a listed word.
+
 - `env.asr` takes SC's `(attackTime sustainLevel releaseTime)`: `.01 1 .3 env.asr`. It took `(attackTime releaseTime)` with the level fixed at 1, so an sclang argument list such as `.01 .5 1` bound .5 as the attack and left .01 on the stack.
+
 - The binary is `stac`, and its environment variables are `STAC_*`: `STAC_SCSYNTH`, `STAC_SYNTHDEFS`, `STAC_RECORDINGS`, `STAC_PRELUDE` and the rest. `sapf-prelude.txt` is `prelude.stac`; `sapf-examples.txt` is `examples/sapf.stac`. Phase 1 of `docs/dev/stac.md`. The `SAPF_` names are not read; rename them in your shell.
+
 - sapf's DSP words, `kr`, `ctl`, `>sd`, `>sf`, `>sfo`, `>nrt`, `ola`, `ramp` and the `ola` event-list words `evmerge`, `evdelay` and `evrest` are in the namespace `sapf`, not the core: `440 0 sapf.sinosc`. `prelude.stac` imports SC's UGens in their place, with SC's arguments: `440 sinosc` is `SinOsc.ar(440)`. `sapf.stac` imports the sapf words over them and holds the 48 prelude definitions built on them. Run sapf programs with `-p prelude.stac -p sapf.stac`; `-p` now repeats. Phase 5 of `docs/dev/stac.md`. The C++ stays; rewriting the words in stac would change output that 108 conformance cases check (`docs/dev/stac-phase5.md`).
 
   The core's `N`, `keep`, `NZ` and `T` take lists only; `sapf.stac`'s also end a UGen. `play` pushes the synth's `Node`; `sapf.stac`'s leaves nothing. `clip`, `wrap` and `fold` stay core words: they compute on reals and build SC's `Clip`, `Wrap` and `Fold` on a UGen.
+
 - Every generated UGen is in one namespace, `sc`, under its lower-case SC class name: `sc.dseq`, `sc.pv_magfreeze`, `sc.playbuf`. The 14 category namespaces and `ug` are gone; SC has one flat class namespace, and 57 of its 400 UGen classes sit in two help categories, so a category gave no single home. Categories remain as help sections, `*** sc: demand ***`. `buffer` keeps `read`, `load` and `alloc`; `node.group` is `group.new`, as SC's `Group.new`. `stac` holds every core word, so `stac.clip` reaches one a binding hides. The core binds no bare UGens; a prelude imports them (`docs/dev/stac.md`, Proposal: canonical namespaces and import).
 
-  ```
+  ```text
   import sc.*                                  ; every UGen but clip, fold, wrap, rand, irand, linrand
   import sapf.* sapf.N sapf.T                  ; a name imports even over a core word
   ```
 
   `import` binds while the file compiles, so it must come before a file's or line's other statements. A wildcard skips core words and `_` names; a later import replaces an earlier one. A statement over a word such as `sc import`, so the linter resolves imports without running the program; `stactool.py lint` follows them.
+
 - Modules. `import geo.*` runs `geo.stac`, from the importing file's directory or `$STAC_PATH`, or finds it already loaded, in its own scope, and binds the names it defines; names starting with `_` stay private, and the module's own imports do not leak. Running the import again after the file changed reloads it, and any module that imports it; a failed reload keeps the loaded version. `prelude.stac`'s 242 statements are the module `std.stac`, and `prelude.stac` is two imports. A module starts empty, rather than layered over the importer's names, so what a user binds cannot change a library's behaviour (`docs/dev/stac.md`, Proposal: modules).
+
 - Top-level names bind late: redefining a word reaches every function that calls it, and players running patterns or `ola` voices, from their next event. sapf bound early, as Forth does, so an edited helper left its callers on the old version until they were rerun. A REPL line or a loaded file publishes its bindings when it ends, so an edit of several words lands at once, and an event sees one version throughout. Late binding by versioned snapshots over replacing values in place, which showed half of an edit to players and cost a lock per lookup (`docs/dev/stac.md`, Proposal: modules).
 
 - The REPL writes no files unless asked: history stays in memory and there is no log. `STAC_HISTORY` and `STAC_LOG` name the files; set them to keep the old behaviour. sapf wrote both to `~`, and the history to the current directory when `HOME` was unset. The legacy `~/sapf-history.txt` is no longer read.
+
 - `stactool.py lint` reads built-in names from `stac --words`, not by parsing `helpall` output.
+
 - `std` words that the dictionary review found wrong: `span` keeps the leading items marked 1 and leaves the rest, as Haskell's `span`; it duplicated `separate`. `coprimes` tests every pair, not the GCD of the whole list, which passed `[8 12 9]`. `ps-inv` negates before it reverses: `[0 4 7]` gives `[0 3 7]`, not `[0 9 5]`. `padz`, `zpad`, `zpadz` and `padzto` take lists as well as signals.
 
 ### Added
@@ -30,87 +38,126 @@
 - A CLAP instrument, `build/examples/clap/stac.clap`, after sapf's: an editor and loopback UDP input, with scsynth inside the plugin ([examples/clap/README.md](examples/clap/README.md)). On Linux, install it with the folder `stac/` beside it, which holds the UGens and the bundled modules. The host's audio callback renders scsynth through a driver that opens no device. Its clock counts rendered frames, so bundle times follow the host's audio, not the wall clock. A driver inside libscsynth over a ring buffer from scsynth's own device thread: it adds no latency and needs no device. `make editor` opens it in a minimal host. It needs X11 and OpenGL headers on Linux; `-DSTAC_BUILD_CLAP=OFF` skips it.
 
   Host-driven, stopping scsynth keeps the UGen plugins loaded. Unloading them, as `quit` does, crashed the next World a host started: its units called the unmapped code.
+
 - Syntax highlighting in the REPL. [tree-sitter-stac/](tree-sitter-stac/) is a tree-sitter grammar for stac with a `highlights.scm` query in nvim-treesitter's capture names; the REPL compiles both in and colours the input line as it is typed. A word is coloured by where it is bound: bright magenta for a UGen of `sc`, bright blue for any other word of the VM or a prelude, bright cyan for the session or the line itself, so a prelude word turns cyan once rebound; a word nothing binds is red, as `stactool.py lint`'s W1, except the word at the cursor, whose prefixes are mostly unbound while it is typed. One grammar for the REPL and for editors, over a C++ tokenizer for the REPL alone, which an editor plugin could not use. The generated `parser.c` is committed, so the build needs no tree-sitter CLI; `make grammar` regenerates it. `STAC_COLORS` overrides a kind's colour with SGR codes, as `LS_COLORS` does, over a theme file format of stac's own; `NO_COLOR` turns colour off; `-DSAPF_TREESITTER=OFF` builds without it.
+
 - `reset` does `stop`, then `clear`: it frees every synth and empties the stack, so no `Node` from `play` outlives its synth.
+
 - [docs/dictionary/](docs/dictionary/): an entry for every word, 1330 in all: what it does, why and when to use it, and an example. `scripts/dictionary.py sync` adds an entry for each new word from `stac --words` and refreshes each entry's name and stack effect; `tests/py/test_dictionary.py` fails when a word has none and runs every example, checking each `;->` line's values. Generated from `--words` over hand-written as one document, so a new word cannot go undocumented.
+
 - `examples.txt`: about 100 lines to paste into the REPL, from a first tone to live edits; `tests/py/test_examples_txt.py` types them into the REPL in order.
+
 - [docs/phrasebook.md](docs/phrasebook.md): 31 everyday phrases in sclang and stac, from a test tone to editing a helper while a pattern plays. `tests/py/test_phrasebook.py` runs every stac block.
+
 - 374 generated UGen words, for 374 of SC's 393 public UGen classes: in the namespace `sc`, e.g. `440 sc.sinosc`, with SC's argument names, order and defaults, e.g. `[1 2 3] inf sc.dseq`. A Form in place of the arguments is a keyword call: `{:dur .25 :level seq} sc.duty`. `numChannels` sets the output count: `{:numChannels 2 :bufnum b :loop 1} sc.playbuf`. `.kr` lowers any UGen's rate; `.done` sets a generated UGen's `doneAction` to 2. The namespace is a new word, so no existing program changes. 262 classes match nanosynth's SCgf byte for byte. Generated words run at the rate written: sapf-sc's rate inference neither lowers them nor lowers their inputs, so `FFT` reads an audio-rate source. Phase 2 in [docs/dev/stac.md](docs/dev/stac.md).
+
 - The `synthdef` statement, which compiles a SynthDef with named controls and binds it callable; `{...} NAME` starts a synth and pushes its `Node`, which takes `.set`, `.release`, `.releaseIn` and `.free`. `t_`, `i_` and `a_` parameters make trigger, scalar and audio controls. The def goes to the server with its first synth. `synthdef.new` is the same as a word, as SC's `SynthDef.new`. `def` defines a function and `const` a constant, in the same shape: keyword, name, parameters, an optional help string, body. A def may declare its results' types after `-->`; each call checks their count and types. The stack effect comes from the header, not from the help string. One shape over sapf's `\args [body] = name` and the earlier `def NAME ... = [BODY]` for SynthDefs, so every definition starts with its keyword and name. `def`, `synthdef` and `const` are reserved words.
 
-  ```
+  ```text
   synthdef pad freq:220 amp:.2 gate:1 [freq saw .01 .2 .6 1 env.adsr gate envgen.kr.done * amp *]
   {:freq 330} pad = n
   {:freq 440} n.set
   n.release
   ```
+
 - `pbind` makes an event stream, a lazy list of Forms; `play` schedules one synth per event and pushes a player that `.stop` ends; `score` writes events to an NRT command file. Events follow SC's default event: pitch from `freq`, `midinote`, or `degree` in a `scale`; `amp` .1; a gate released after `dur * legato`; `'rest`; a list value plays a chord. First slice of phase 4.
 
-  ```
+  ```text
   {:instrument 'ping :degree [0 2 4 5 7] picks :scale 'minor :dur .125} pbind play = p
   p.stop
   ```
+
 - `clock.new` and `pdef`. A clock maps beats to server time, as SC's `TempoClock` does; `{:tempo t} clk.set` changes its tempo while events play. `pdef` replaces a named stream on the next whole beat of the default clock, as SC's `Pdef` with its default quant of 1; `events name clk.pdef` uses another clock, and `{:quant q} p.set` another quant. An event's `:tempo` sets its clock's tempo, as SC's `~tempo`; `score` and `render` follow it. Events and their releases are timed in beats, so a tempo change moves both. `play` now sends each event .2 s before it starts; it sent it .2 s before the next event, late by `dur - .2` s.
 
-  ```
+  ```text
   2 clock.new = clk
   {:instrument 'ping :midinote [60 64] cyc :dur .5} pbind clk.play
   {:tempo 3} clk.set
   {:instrument 'ping :midinote [60 62 64] cyc :dur .25} pbind 'mel pdef = p
   ```
+
 - `.ir` and `.poll` on a UGen, as SC's: `3 bufframes.ir`, `2 lfnoise1.kr.poll`. `.poll` prints at 10 Hz on scsynth's console, labelled `UGen(LFNoise1)` as sclang does; it returns its input, and its `Poll` compiles wherever that input does.
+
 - `group.new`, `bus.control` and `send`. `{} group.new = g` makes a group that `{:target g}` places synths in and `g.free` frees. `2 bus.control = b  [.5 .25] b.set` allocates control buses from 16383 down and sets them. `["/n_free" 1000] send` sends any message, whole reals as ints as sclang's `sendMsg` does.
+
 - The REPL completes names with tab and hints each word's stack effect, as in `sinosc  (freq --> out)`. A plain prefix also finds namespaced words, `pv_magf<TAB>` giving `sc.pv_magfreeze`; after a dot it offers the namespace's words or the methods of stac's objects. An undefined word that a namespace holds gets a suggestion, from sapf and from the linter: `"pv_magfreeze" is an undefined word; sc.pv_magfreeze?`. Names come from the running interpreter, so the planned renaming needs no change here.
+
 - `:instrument` may be a function. Each argument takes the event's field of that name; `freq`, `amp`, `dur`, `legato` and `sustain` take the event's derived values. Each note's channels compile to a def, and notes that compile alike share one, as `ola` voices do in a score. `:out`, a bus index or Bus, sets the bus it writes to. Compiling per note over a def with controls lets a value set what a control cannot, such as a duration given to `T`. The channels must end, as an `ola` voice's do.
 
-  ```
+  ```text
   {:instrument \freq sustain [freq 0 sinosc .1 * sustain T] :degree [0 2 4] cyc :dur .25} pbind play
   ```
+
 - `ndef` plays channels under a name. Run again, it fades the new sound in and the old one out over `fadeTime`, .02 s by default, and pushes the same ndef. The fade is SC's `ProxySynthDef` wrapping: the channels times an `EnvGate`, released by `gate`. A gate envelope per synth was chosen over an `XFade2` on a bus, which needs a mixing synth that lives as long as the ndef. As in SC, the synth writes a private bus and a monitor synth copies it to bus 0. `nd.ar` reads the bus, so one ndef can process another; `nd.stop` and `nd.play` fade the monitor; `nd.end` fades out both.
 
-  ```
+  ```text
   [[55 55.2] saw .1 *] 'drone ndef = d
   {:fadeTime 2} d.set
   [[55 55.2] saw 800 .3 rlpf .1 *] 'drone ndef
   d.stop
   ```
+
 - `render` `(item seconds name -->)` writes `name.wav` with the embedded scsynth, from channels or an event stream. Events render to 2 channels, SC's default for `Score.render`. The duration is explicit, as in SC's `Score.render`, because `>sf`'s inferred length refuses graphs whose end is unknown, and event streams are often infinite.
+
 - `bus.audio`, `buffer.read`, `buffer.load` and `buffer.alloc`, for effects on private buses and samples in buffers. A Bus, Buffer or Node is its index as a UGen input or a control value: `1 bus.audio = fx  {:bus fx :addAction 'tail} verb`. `buffer.load` waits for `/b_alloc` to finish before `/b_setn`, which scsynth would otherwise apply to no buffer. `b.free` frees a bus or buffer for reuse, as SC's `free`.
+
 - The `Env` type and the `env` namespace, SC's envelopes: `.01 .2 .6 1 env.adsr gate envgen.kr.done`. `env.perc`, `env.adsr`, `env.asr`, `env.linen` take SC's times positionally and its other defaults; `env.new` takes levels, times and curves, a curve being a number, a UGen or a shape such as `'exp`. `envgen` and `ienvgen` send an `Env` in SC's two array formats. First slice of phase 3.
+
 - `stac --words` prints every word, after the preludes, as JSON: name, section, stack effect, help, automap mask and source. JSON over plain lines, because editor plugins and the planned dictionary of words need the help too.
+
 - `scripts/sclang_wire.py` writes `spec/sclang-wire.json`: each UGen rate method's input order, read from its `multiNew` call in SC's class library and checked against the inputs sclang built in `spec/sclang-reference.json`. 579 of 635 methods get a trusted order; `gen_ugens.py` uses them in place of hand-written orders. Read from source rather than probed at run time, because the probe needs sclang 3.14.1 and the installed 3.13 cannot compile the 3.14 class library.
+
 - `spec/sclang-reference.json`: 407 UGen classes from SC 3.14.1, with args, defaults and rates, vendored from nanosynth `7a212da`. stac's generated UGen words read it. Vendored rather than read from `../nanosynth`, so a build needs no sibling checkout.
+
 - `scripts/stactool.py`, a formatter and linter for sapf source. Its lexer ports `Parser.cpp`'s token rules and keeps comments, so formatting changes only indentation and trailing whitespace, and it checks that the token stream is unchanged. The linter resolves names in source order, as the compiler does, so it reports words used before they are bound. It reads built-in names from `helpall` in `build/sapf`, so its word list cannot drift from the binary.
 
-  ```
+  ```text
   uv run python scripts/stactool.py fmt [--check] [--indent N|tab] FILE...
   uv run python scripts/stactool.py lint [--prelude prelude.stac] FILE...
   ```
 
 - `env.perc`, `env.adsr`, `env.asr` and `env.linen` take a Form of SC's arguments by name, as the generated UGen words do; a missing argument takes SC's default. The Form also reaches `level`, `peakLevel`, `curve` and `bias`, which the stack form leaves at their defaults: `{:sustainLevel .6 :curve -8} env.adsr`.
+
 - Control-rate `ndef`s and `.clear`. A source with no audio-rate channel, such as `4 sc.lfnoise1.kr` or `.5`, plays on control buses with no monitor, as SC's; `nd.kr` reads it, and `nd.ar` reads either rate. `nd.clear` frees the synth and monitor and returns the bus, as SC's `clear` with its default fadeTime of 0; the next run takes a new bus at its own rate and channel count.
+
 - A file run without `-i` warns when values are left on the stack at its end. A missing argument otherwise passes silently: a dropped `osc` made `>nrt` write a score of the wrong value. The warning is at the end of the run, not in `>nrt`, because the REPL keeps values on the stack on purpose.
 
 ### Fixed
 
 - `stop` left up to two `ola` voice defs on scsynth each time. A voice's `/d_free` is in its start bundle, sent .2 s ahead; `/clearSched` dropped the pending bundles after their `/d_recv` had loaded the defs. `stop` now frees the defs of voices that had not started. A voice sent while `stop` ran could also land after `/clearSched` and start after the stop; sending a voice and `stop` now take one lock.
+
 - A def's UGen order, and so its bytes, could differ between gcc and clang builds. Six graph helpers, for `bpf`, `bsf`, `lpf1`, `hpf1`, the 12 dB filters, the `comb` words, `line` and the end gate of a finite signal, built two nodes inside one call's arguments, whose evaluation order C++ leaves unspecified; node creation order breaks ties in the topological sort. Each now builds in its own statement, in the order clang used, so clang's defs are unchanged. `tests/py/test_graph_order.py` pins the orders; CI's Ubuntu job runs it under gcc.
+
 - `play` took node IDs from 2000001 in a fixed sequence, so a second or restarted stac on the same server reused the IDs of synths still running, and its `/s_new` failed. It now takes them from the process's own block, as `synthdef` synths and patterns do.
+
 - `play` refuses a channel that is a constant outside -1..1: `[440 0 sinosc .1 *] play` under `prelude.stac` sent DC 440 to channel 0, which the DAC clips to full-scale DC. An error over clipping, which keeps the DC, or a warning, which still plays it. Constants within -1..1 still play, as CV on DC-coupled outputs such as the SSP's.
+
 - A UGen with no outputs, such as `out`, `localout` or `sendtrig`, in a plain `[...] play` list was dropped from the graph; only a `synthdef` body kept it. Such a UGen now returns a `Root`, printed `<LocalOut>`, which `play`, `>sd`, `>sf` and `ndef` make a root of the graph. A `Root` is not a signal, so arithmetic on it fails; `pop` still drops it. The value carries the root, over a collector per REPL line, which would lose a root bound on one line and played on the next. A `synthdef` body that leaves only Roots no longer gets an `out` control.
+
 - `"a""b"` failed to parse: a doubled quote ended the string after adding the quote. It is now the string `a"b`. Upstream sapf has the same bug ([docs/dev/upstream-sapf-bugs.md](docs/dev/upstream-sapf-bugs.md)).
+
 - Workspace and built-in lookups matched a name by its 32-bit hash alone, so two names with the same hash read each other's bindings. They now compare the name too.
+
 - `quit` segfaulted on Linux while a synth played. SC's `World_Cleanup` unloads the UGen plugins before it stops the audio driver and frees the synths, so the audio thread and the Unit destructors ran unmapped code. `patch-supercollider.sh` moves the unload after both, so the plugins' unload hooks still run; keeping the plugins loaded, the other fix, skipped them. Exit also stops the players and refuses later sends before it frees the World: a player thread sent to it while it was freed.
+
 - Loading a file terminated its text one byte early. An empty file, such as `STAC_PRELUDE=/dev/null`, wrote before the buffer and parsed uninitialised bytes; a file without a final newline lost its last character.
+
 - On Linux, `stac --words` began with SC's Green FFT banner on stdout, which broke its JSON. `patch-supercollider.sh` deletes the banner.
+
 - A NaN printed as `-nan` on x86 Linux and `nan` on macOS. It now prints `nan` everywhere.
 
 - `sapf.evmerge` crashed stac on an event without `:dt`; it now reports it. `1 sapf.evrest` underflowed: it was declared with three arguments.
+
 - `#[1 1 2] permzwr` crashed stac: it filled a list of values as floats. It now gives a list of signals, as `permz` does.
+
 - `sortf` and `gradef` could not run: they fetched their compare function as a list. `+^i` and the other pairwise forms with an initial value took one argument where they need two. Help lines that misstated behaviour are corrected, among them `wrapAt`, `foldAt` and `clipAt`, whose descriptions were rotated (list in [docs/dev/upstream-sapf-bugs.md](docs/dev/upstream-sapf-bugs.md)).
+
 - `try` caught nothing: after its handler ran, it rethrew the error, as `protect` does. `throw` ignored its value and threw -1; it now throws the value it takes. A caught error no longer prints its backtrace, which was printed frame by frame as the error unwound. All three are upstream sapf behaviour ([docs/dev/upstream-sapf-bugs.md](docs/dev/upstream-sapf-bugs.md)).
+
 - `{}` segfaulted when printed or read with a key: it evaluated to a Form with no table. It is now an empty Form. Upstream sapf has the same bug; see [docs/dev/upstream-sapf-bugs.md](docs/dev/upstream-sapf-bugs.md).
+
 - `skipWhile` with a predicate function returned wrong values on `Z` lists when the cutoff fell mid-chunk. The tail copy offset the source by `i * sizeof(V)` bytes instead of `i * sizeof(Z)`, so it copied the wrong elements and could read past the end of the source buffer.
+
 - The `sapf` executable linked `libsapf.a` twice, which made Apple ld warn `ignoring duplicate libraries`. It now links only `sapf_server` when present, and gets the engine through it.
 
 ### Removed
