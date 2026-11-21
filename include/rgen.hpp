@@ -91,14 +91,12 @@ struct RGen
 	double rand(double lo, double hi);
 	double xrand(double lo, double hi);
 	double linrand(double lo, double hi);
-	double trirand(double lo, double hi);
 	double coin(double p);
 	
 	int64_t irand(int64_t lo, int64_t hi);
 	int64_t irand0(int64_t n);
 	int64_t irand2(int64_t scale);
 	int64_t ilinrand(int64_t lo, int64_t hi);
-	int64_t itrirand(int64_t lo, int64_t hi);
 	
 };
 
@@ -157,12 +155,6 @@ inline double RGen::linrand(double lo, double hi)
 	return lo + (hi - lo) * std::min(drand(), drand());
 }
 
-inline double RGen::trirand(double lo, double hi)
-{
-	double a = drand();  // separate statements: the order of operands' evaluation is unspecified
-	return lo + (hi - lo) * (.5 + .5 * (a - drand()));
-}
-
 inline double RGen::coin(double p)
 {
 	return drand() < p ? 1. : 0.;
@@ -187,13 +179,6 @@ inline int64_t RGen::irand2(int64_t scale)
 inline int64_t RGen::ilinrand(int64_t lo, int64_t hi)
 {
 	return lo + (int64_t)floor((hi - lo) * std::min(drand(), drand()));
-}
-
-inline int64_t RGen::itrirand(int64_t lo, int64_t hi)
-{
-	double scale = (double)(hi - lo);
-	double a = drand();
-	return lo + (int64_t)floor(scale * (.5 + .5 * (a - drand())));
 }
 
 #endif

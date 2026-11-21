@@ -1,10 +1,10 @@
 # Next steps
 
-State as of 2026-11-20, at ea18b2a and the working tree. ../ssp's state and tasks are in docs/dev/ssp.md.
+State as of 2026-11-21, at 8bc24e3 and the working tree. ../ssp's state and tasks are in docs/dev/ssp.md.
 
 ## State
 
-- `make test` passes on macOS: 306 ctest; 1072 pytest passed, 112 skipped. CI (`.github/workflows/build.yml`) builds and tests on macOS and Ubuntu each push; it last passed at ea18b2a.
+- `make test` passes on macOS: 306 ctest; 1073 pytest passed, 112 skipped. CI (`.github/workflows/build.yml`) builds and tests on macOS and Ubuntu each push; it last passed at 8bc24e3. The Ubuntu job also builds `stac` with clang, and `tests/py/test_compilers.py` checks that gcc's and clang's builds write the same defs for every `play` in `examples/sapf.stac`.
 
 - docs/dictionary/ has an entry for every word, 1330 in all, and docs/phrasebook.md 31 phrases; the tests run every example in both and in the README.
 
@@ -12,7 +12,7 @@ State as of 2026-11-20, at ea18b2a and the working tree. ../ssp's state and task
 
 - SuperCollider 3.14.1 and libsndfile 1.2.2 are fetched as pinned tarballs. `cmake/patch-supercollider.sh` makes SC build as a subdirectory and keeps the UGens loaded after an NRT render.
 
-- `examples/sapf.stac` keeps 216 of sapf's 312 examples; 160 play or render. They need `-p prelude.stac -p sapf.stac`. sapf's prelude is split: `std.stac`, a module, and `sapf.stac`, which holds the 48 definitions over sapf's DSP words.
+- `examples/sapf.stac` keeps, unchanged, 161 of the 242 examples that play or render in sapf's `sapf-examples.txt` (lfnoise/sapf `9f1bd6b`): 155 `play`, 6 `>sfo`. It keeps 219 of the file's 349 blocks of code in all. The earlier "216 of 312 examples run" came from a script that is gone and is not reproducible. The examples need `-p prelude.stac -p sapf.stac`. sapf's prelude is split: `std.stac`, a module, and `sapf.stac`, which holds the 48 definitions over sapf's DSP words.
 
 - Polyphony: `pbind play` in stac; sapf's `ola` voices are synths on private buses from 512 up, below those `bus.audio` takes, scheduled by a thread for `play`, or written into an NRT score by `>nrt`.
 
@@ -40,4 +40,4 @@ In TODO.md, in order of priority.
 
 - Reference renders: `SAPF_ORIG=<sapf> uv run python scripts/make_reference.py [case names]`. The macOS release of sapf v0.1.22 (https://github.com/lfnoise/sapf/releases/tag/v0.1.22) works: it has no `-q` and runs no file argument, so each case runs as the prelude (`-p`) and `quit` goes to stdin. The `op1_log*` references come from that release; the other 194 came from an earlier ../sapf build that is gone. Before regenerating, `scripts/check_reference.py <case names>` compares fresh renders with the stored references without writing them.
 
-- The example check ran each block of sapf's examples with `play` redefined as `\c [c 1 "ex" >nrt] = play` and `>sfo` as `\c n [c n >sf] = >sfo`, after loading the definitions that passed. The script is gone; it is about 60 lines of Python.
+- The example check ran each block of sapf's examples with `play` redefined as `\c [c 1 "ex" >nrt] = play` and `>sfo` as `\c n [c n >sf] = >sfo`, after loading the definitions that passed. The script is gone. `tests/py/test_compilers.py` uses the same rebinding over the whole file and is the place to start a new one.

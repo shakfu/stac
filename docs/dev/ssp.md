@@ -24,7 +24,7 @@ State as of 2026-10-14, on the Linux machine, ../ssp branch `sapf` (`c1290dd`).
 
 1. A `sapf` SSP plugin for live coding: the interpreter with its own `ScWorld`, ttyp's keyboard input, a multi-line editor, the prelude loaded at start. Design: ../ssp docs/dev/sapf-plugin.md. Step 1 (the interpreter on the SSP) passed 2026-10-14. Its sapf-sc changes: `SAPF_REPLXX` (CMake option, default ON), and `Array::setSize`/`addSize` taking `int64_t`: as `size_t`, `Gen::produce`'s negative delta became 2^32 - k on 32-bit ARM and crashed every list operation. Steps 2 and 4 still need `ScsynthServer::now()`, a `post` hook and an interrupt flag.
 
-2. Compiler-dependent graphs: with the same seed, gcc and clang builds write different defs for six examples (e.g. `rocks on rails`): UGen order and random draws follow function argument evaluation order, which C++ leaves unspecified. Six such sites in `SCUGens.cpp`, and two in `rgen.hpp`, were found by a scan and fixed (CHANGELOG, Fixed). `tests/py/test_compilers.py` compares every `play` in `examples/sapf.stac` between a gcc and a clang build, in CI's Ubuntu job.
+2. Compiler-dependent graphs: with the same seed, gcc and clang builds write different defs for six examples (e.g. `rocks on rails`): UGen order and random draws follow function argument evaluation order, which C++ leaves unspecified. Six such sites in `SCUGens.cpp` were found by a scan and fixed (CHANGELOG, Fixed); two in `rgen.hpp` had no callers and were removed. `tests/py/test_compilers.py` compares every `play` in `examples/sapf.stac` between a gcc and a clang build, in CI's Ubuntu job; it passed first on `8bc24e3` (gcc 15.2.0, clang 21.1.8).
 
 ## Known differences from sapf
 

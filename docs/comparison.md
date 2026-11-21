@@ -159,6 +159,6 @@ stac's own words are in the [dictionary](dictionary/).
 
 - sapf's prelude: 280 of 285 definitions load, split between `std.stac` and `sapf.stac`. The 5 dropped use `hilbert`, `fft` or `kaiser`.
 
-- `examples/sapf.stac`: 216 of 312 examples run; 160 play or render. Most failures use `lpcombc`, mouse words, `violet`, `klang`, `pdiv`, `zplug` or `set`.
+- `examples/sapf.stac`: 161 of sapf's 242 examples that play or render run unchanged. Most failures use `lpcombc`, mouse words, `violet`, `klang`, `pdiv`, `zplug` or `set`.
 
 - Identical output for old programs is not a goal. See the policy in [dev/upstream-sapf-bugs.md](dev/upstream-sapf-bugs.md).

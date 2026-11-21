@@ -82,7 +82,7 @@ uv run python scripts/dictionary.py check                 # dictionary entries f
 
 ## sapf programs
 
-`sapf.stac` imports sapf's words over the SC UGens and adds the 48 prelude definitions built on them; `examples/sapf.stac` keeps 216 of sapf's 312 examples, 160 of which play or render.
+`sapf.stac` imports sapf's words over the SC UGens and adds the 48 prelude definitions built on them; `examples/sapf.stac` keeps 161 of the 242 sapf examples that play or render.
 
 ```sh
 build/stac -p prelude.stac -p sapf.stac

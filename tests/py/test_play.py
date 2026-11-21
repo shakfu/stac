@@ -53,11 +53,11 @@ def synths(server):
     return status().contents[2]
 
 
-def wait_for_synth(server, timeout=5.0):
-    """Waits for the first synth, so timings count from it rather than from sapf's startup."""
+def wait_for_synth(server, n=1, timeout=5.0):
+    """Waits for n synths, so timings count from them rather than from sapf's startup."""
     deadline = time.monotonic() + timeout
-    while synths(server) == 0:
-        assert time.monotonic() < deadline, "no synth started"
+    while synths(server) < n:
+        assert time.monotonic() < deadline, f"{n} synths did not start"
         time.sleep(0.01)
 
 
@@ -121,7 +121,8 @@ def test_ola_voices_start_and_stop(server, sapf, tmp_path):
     proc = subprocess.Popen([str(SAPF), "-q", *SAPF_LIB, "-i", str(src)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, text=True, env=env)
     try:
-        time.sleep(1.5)
+        wait_for_synth(server)
+        time.sleep(1)
         # The main synth and the voices of the last .3 s, .1 s apart.
         assert 3 <= synths(server) <= 5
         proc.stdin.write("stop\n")
@@ -143,7 +144,8 @@ def test_ola_stops_with_its_main_synth(server, sapf, tmp_path):
     proc = subprocess.Popen([str(SAPF), "-q", *SAPF_LIB, "-i", str(src)], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                             stderr=subprocess.STDOUT, text=True, env=env)
     try:
-        time.sleep(1.5)
+        wait_for_synth(server)
+        time.sleep(1.2)
         assert synths(server) == 0
     finally:
         proc.stdin.close()
@@ -374,7 +376,8 @@ def test_events_release_their_gate(server, sapf, tmp_path):
     """Each note is released after dur * legato and frees itself, so synths do not pile up."""
     proc = interactive(GATED + "{:instrument 'gated :dur .1 :legato .5} pbind play\n", tmp_path)
     try:
-        time.sleep(1.5)
+        wait_for_synth(server)
+        time.sleep(1)
         assert 2 <= synths(server) <= 6  # 15 started; each lasts about .35 s
         proc.stdin.write("stop\n")
         proc.stdin.flush()
@@ -391,7 +394,8 @@ def test_ndef_crossfades_and_stops(server, sapf, tmp_path):
     proc = interactive("300 0 sinosc 0 * 'drone ndef = d\n", tmp_path)
     send = lambda line: (proc.stdin.write(line + "\n"), proc.stdin.flush())
     try:
-        time.sleep(.5)
+        wait_for_synth(server, 2)
+        time.sleep(.1)
         assert synths(server) == 2
         send("{:fadeTime 1} d.set  400 0 sinosc 0 * 'drone ndef")
         time.sleep(.6)
