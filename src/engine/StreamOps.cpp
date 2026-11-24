@@ -2587,28 +2587,7 @@ public:
 		}
 	}
 	
-	void getNext()
-	{
-		int N = (int)mOrder.size();
-		int i = N - 1;
-		while (mOrder[i-1] >= mOrder[i]) 
-			i = i-1;
-
-		if (i <= 0) return;
-
-		int j = N;
-		while (mOrder[j-1] <= mOrder[i-1]) 
-			j = j-1;
-
-		std::swap(mOrder[i-1], mOrder[j-1]);
-
-		i++; j = N;
-		while (i < j) {
-			std::swap(mOrder[i-1], mOrder[j-1]);    
-			i++;
-			j--;
-		}
-	}
+	void getNext() { std::next_permutation(mOrder.begin(), mOrder.end()); }
 };
 
 class Permz : public Gen
@@ -2665,28 +2644,7 @@ public:
 		}
 	}
 	
-	void getNext()
-	{
-		int N = (int)mOrder.size();
-		int i = N - 1;
-		while (mOrder[i-1] >= mOrder[i]) 
-			i = i-1;
-
-		if (i <= 0) return;
-
-		int j = N;
-		while (mOrder[j-1] <= mOrder[i-1]) 
-			j = j-1;
-
-		std::swap(mOrder[i-1], mOrder[j-1]);
-
-		i++; j = N;
-		while (i < j) {
-			std::swap(mOrder[i-1], mOrder[j-1]);    
-			i++;
-			j--;
-		}
-	}
+	void getNext() { std::next_permutation(mOrder.begin(), mOrder.end()); }
 };
 
 static void perms_(Thread& th, Prim* prim)

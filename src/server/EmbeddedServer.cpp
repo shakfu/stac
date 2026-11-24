@@ -22,6 +22,7 @@
 #include <deque>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -110,39 +111,35 @@ std::string copyFrames(const std::string& from, const std::string& to, int chann
 class EmbeddedServer : public ScsynthServer
 {
 public:
+	EmbeddedServer() { gInstance = this; }
+
+	// Replies go to the channel each packet was sent on, so concurrent callers do not take each
+	// other's /synced or /fail; the /sync ID is the channel too.
 	std::string sendSync(const std::vector<std::string>& packets, int timeoutMs) override
 	{
+		Channel ch(*this);
 		std::string error;
-		std::unique_lock<std::mutex> lock(mutex_);
-		replies_.clear();
-		lock.unlock();
 		for (const std::string& p : packets)
-			if (!sendPacket(p, error)) return error;
-		const int syncID = 7301;
-		if (!sendPacket(oscMessage("/sync", {{OscArg::Int, syncID, ""}}), error)) return error;
-		lock.lock();
-		auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
-		for (;;) {
-			while (!replies_.empty()) {
-				std::string reply = replies_.front();
-				replies_.pop_front();
-				size_t pos = 0;
-				std::string address = oscString(reply, pos);
-				if (address == "/synced") return "";
-				if (address == "/fail") {
-					oscString(reply, pos); // type tags
-					std::string command = oscString(reply, pos);
-					return command + ": " + oscString(reply, pos);
-				}
+			if (!sendPacket(p, error, ch.id)) return error;
+		if (!sendPacket(oscMessage("/sync", {{OscArg::Int, (int)ch.id, ""}}), error, ch.id)) return error;
+		std::string reply;
+		while (ch.next(reply, timeoutMs)) {
+			size_t pos = 0;
+			std::string address = oscString(reply, pos);
+			if (address == "/synced") return "";
+			if (address == "/fail") {
+				oscString(reply, pos); // type tags
+				std::string command = oscString(reply, pos);
+				return command + ": " + oscString(reply, pos);
 			}
-			if (cv_.wait_until(lock, deadline) == std::cv_status::timeout && replies_.empty()) return "no reply";
 		}
+		return "no reply";
 	}
 
 	void send(const std::string& packet) override
 	{
 		std::string error;
-		sendPacket(packet, error);
+		sendPacket(packet, error, 0);  // channel 0: its replies are dropped
 	}
 
 	std::string address() override { return "this process"; }
@@ -253,27 +250,19 @@ public:
 			std::lock_guard<std::mutex> lock(worldMutex_);
 			if (!world_) return -1;
 		}
-		std::unique_lock<std::mutex> lock(mutex_);
-		replies_.clear();
-		lock.unlock();
-		std::string error;
-		if (!sendPacket(oscMessage("/status", {}), error)) return -1;
-		lock.lock();
-		auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
-		for (;;) {
-			while (!replies_.empty()) {
-				std::string reply = replies_.front();
-				replies_.pop_front();
-				size_t pos = 0;
-				if (oscString(reply, pos) != "/status.reply") continue;
-				oscString(reply, pos);  // type tags; then ints: unused, UGens, synths
-				pos += 8;
-				if (pos + 4 > reply.size()) return -1;
-				const auto* b = (const unsigned char*)reply.data() + pos;
-				return (int)((uint32_t)b[0] << 24 | (uint32_t)b[1] << 16 | (uint32_t)b[2] << 8 | b[3]);
-			}
-			if (cv_.wait_until(lock, deadline) == std::cv_status::timeout && replies_.empty()) return -1;
+		Channel ch(*this);
+		std::string error, reply;
+		if (!sendPacket(oscMessage("/status", {}), error, ch.id)) return -1;
+		while (ch.next(reply, 1000)) {
+			size_t pos = 0;
+			if (oscString(reply, pos) != "/status.reply") continue;
+			oscString(reply, pos);  // type tags; then ints: unused, UGens, synths
+			pos += 8;
+			if (pos + 4 > reply.size()) return -1;
+			const auto* b = (const unsigned char*)reply.data() + pos;
+			return (int)((uint32_t)b[0] << 24 | (uint32_t)b[1] << 16 | (uint32_t)b[2] << 8 | b[3]);
 		}
+		return -1;
 	}
 
 private:
@@ -312,6 +301,9 @@ private:
 			error = "scsynth did not start; check the audio device, or set STAC_SCSYNTH to use a running server";
 			return false;
 		}
+		// node notifications, before any synth starts: /n_end releases the slots a synth held
+		std::string notify = oscMessage("/notify", {{OscArg::Int, 1, ""}});
+		World_SendPacketWithContext(world_, (int)notify.size(), notify.data(), onReply, (void*)kNotifyChannel);
 		if (hostDriven_) {
 			hostWorld_ = world_;
 			return true;  // the host stops it: onExit's _exit would end the host's process
@@ -322,12 +314,12 @@ private:
 	}
 
 	// The lock keeps shutdown from freeing the World while a player thread sends to it.
-	bool sendPacket(const std::string& packet, std::string& error)
+	bool sendPacket(const std::string& packet, std::string& error, intptr_t channel)
 	{
 		std::lock_guard<std::mutex> lock(worldMutex_);
 		if (!boot(error)) return false;
 		std::string copy = packet;  // World_SendPacket takes a mutable buffer and copies it
-		World_SendPacketWithContext(world_, (int)copy.size(), copy.data(), onReply, this);
+		World_SendPacketWithContext(world_, (int)copy.size(), copy.data(), onReply, (void*)channel);
 		return true;
 	}
 
@@ -345,13 +337,49 @@ private:
 			hostWorld_ = nullptr;
 		}
 		if (world) World_Cleanup(world, !hostDriven_);
+		scsynthAllNodesEnded();
 	}
 
+	// A caller's replies, from when it opens the channel until it closes it.
+	struct Channel {
+		EmbeddedServer& server;
+		intptr_t id;
+		std::deque<std::string> replies;
+		explicit Channel(EmbeddedServer& s) : server(s), id(++s.lastChannel_)
+		{
+			std::lock_guard<std::mutex> lock(server.mutex_);
+			server.channels_[id] = this;
+		}
+		~Channel()
+		{
+			std::lock_guard<std::mutex> lock(server.mutex_);
+			server.channels_.erase(id);
+		}
+		// The next reply, waiting up to timeoutMs from now; false on timeout.
+		bool next(std::string& reply, int timeoutMs)
+		{
+			std::unique_lock<std::mutex> lock(server.mutex_);
+			auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
+			if (!server.cv_.wait_until(lock, deadline, [this] { return !replies.empty(); })) return false;
+			reply = std::move(replies.front());
+			replies.pop_front();
+			return true;
+		}
+	};
+
+	// On scsynth's threads. A reply for a closed channel, or channel 0, is dropped.
 	static void onReply(ReplyAddress* addr, char* buf, int size)
 	{
-		auto* self = static_cast<EmbeddedServer*>(addr->mReplyData);
+		if ((intptr_t)addr->mReplyData == kNotifyChannel) {
+			int node = oscNodeEnded(std::string(buf, (size_t)size));
+			if (node >= 0) scsynthNodeEnded(node);
+			return;
+		}
+		EmbeddedServer* self = gInstance;
 		std::lock_guard<std::mutex> lock(self->mutex_);
-		self->replies_.emplace_back(buf, (size_t)size);
+		auto it = self->channels_.find((intptr_t)addr->mReplyData);
+		if (it == self->channels_.end()) return;
+		it->second->replies.emplace_back(buf, (size_t)size);
 		self->cv_.notify_all();
 	}
 
@@ -377,11 +405,14 @@ private:
 	}
 
 	static inline EmbeddedServer* gSelf = nullptr;
+	static inline EmbeddedServer* gInstance = nullptr;  // never destroyed
+	static constexpr intptr_t kNotifyChannel = -1;  // /notify's: scsynth sends node notifications to it
 	World* world_ = nullptr;
 	bool closed_ = false;
 	std::mutex worldMutex_, mutex_;
 	std::condition_variable cv_;
-	std::deque<std::string> replies_;
+	std::map<intptr_t, Channel*> channels_;
+	std::atomic<intptr_t> lastChannel_{0};
 
 	bool hostDriven_ = false;
 	std::atomic<double> hostRate_{0.}, hostStart_{0.};

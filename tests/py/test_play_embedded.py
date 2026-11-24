@@ -43,3 +43,30 @@ def test_quit_while_sound_plays_exits_cleanly(code):
     if "scsynth did not start" in out:
         pytest.skip("no audio device")
     assert proc.returncode == 0 and "error" not in out and "failed" not in out, out
+
+
+def test_each_caller_gets_its_own_replies():
+    """A pattern thread syncs each event's def while the main thread's sets fail. Each set reports its
+    own /fail; one shared reply queue lost most of them and stopped the pattern with another's."""
+    fn = "\\freq [freq sinosc 0 * .001 .02 env.perc 1 envgen.kr.done *]"
+    code = f"{{:instrument {fn} :midinote 20 119 to :dur .01}} pbind play pop\n"
+    code += "[440 sinosc 0 *] play = n n.free {:freq 1} n.set\n" * 20 + "1.5 sleep\nquit\n"
+    env = {k: v for k, v in os.environ.items() if k != "STAC_SCSYNTH"}
+    out = subprocess.run([str(SAPF), "-q", "-p", str(ROOT / "prelude.stac")], input=code, capture_output=True,
+                         text=True, env=env, timeout=60).stdout
+    if "scsynth did not start" in out:
+        pytest.skip("no audio device")
+    assert out.count("set : scsynth at this process: /n_set: Node") == 20, out
+    assert "stopped" not in out, out
+
+
+def test_wave_table_slots_return_when_synths_end():
+    """25 tables, past the 17 slots, each played and freed: scsynth's /n_end releases each slot."""
+    code = "".join(f"[100 0 #[1 .{i + 10}] 0 0 wavefill osc .001 *] stac.play = n .1 sleep n.free .1 sleep\n"
+                    for i in range(25)) + "quit\n"
+    env = {k: v for k, v in os.environ.items() if k != "STAC_SCSYNTH"}
+    out = subprocess.run([str(SAPF), "-q", *SAPF_LIB], input=code, capture_output=True, text=True, env=env,
+                         timeout=60).stdout
+    if "scsynth did not start" in out:
+        pytest.skip("no audio device")
+    assert "error" not in out, out

@@ -83,3 +83,61 @@ jobs:
             build/examples/clap/stac.clap
             build/examples/clap/stac/
           retention-days: 14
+
+  # The suites under ASan with UBSan, and under TSan. A report fails a test through the exit code:
+  # ASan aborts, TSan exits 66. Suppressions are in tests/sanitizers/.
+  sanitize:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: asan
+            flags: -fsanitize=address,undefined
+          - name: tsan
+            flags: -fsanitize=thread
+    runs-on: ubuntu-latest
+    env:
+      ASAN_OPTIONS: detect_leaks=0
+      # halt_on_error over -fno-sanitize-recover: suppressions apply only to recoverable checks
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1:suppressions=${{ github.workspace }}/tests/sanitizers/ubsan.supp
+      TSAN_OPTIONS: suppressions=${{ github.workspace }}/tests/sanitizers/tsan.supp
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libx11-dev libgl1-mesa-dev
+
+      # Ubuntu's default 32 bits of mmap randomization break the TSan and ASan runtimes at startup
+      - name: Lower mmap randomization
+        run: sudo sysctl vm.mmap_rnd_bits=28
+
+      - name: Cache compilation
+        uses: hendrikmuhs/ccache-action@v1.2.25
+        with:
+          key: sanitize-${{ matrix.name }}
+          max-size: 1G
+
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+
+      - name: Configure CMake
+        run: >
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -Wno-dev
+          -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
+          "-DCMAKE_C_FLAGS=${{ matrix.flags }} -O1 -g -fno-omit-frame-pointer"
+          "-DCMAKE_CXX_FLAGS=${{ matrix.flags }} -O1 -g -fno-omit-frame-pointer"
+          "-DCMAKE_EXE_LINKER_FLAGS=${{ matrix.flags }}"
+          "-DCMAKE_SHARED_LINKER_FLAGS=${{ matrix.flags }}"
+          "-DCMAKE_MODULE_LINKER_FLAGS=${{ matrix.flags }}"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run ctest
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Run pytest
+        run: uv run pytest -q -m "not timing"

@@ -42,3 +42,27 @@ def test_error(code, message, sapf_bin, tmp_path):
 def test_writes_to_synthdefs_dir(sapf_bin, tmp_path):
     out = run_sapf(f'{SIG} "named" >sd', tmp_path)
     assert (tmp_path / "named.scsyndef").read_bytes()[:4] == b"SCgf", out
+
+
+@pytest.mark.parametrize(
+    "code, message",
+    [
+        ("0 = g \\[g] = g g", "error: stack overflow"),
+        ("0 = g \\[[g] !] = g g", "error: stack overflow"),
+        ("0 = g \\[g] = g \\[g] go .5 sleep", "go : error: stack overflow"),
+        ("\\[pop] go .5 sleep", "go : error: stack underflow"),
+        (".01 1 {:curve []} env.perc", "needs one or more curves"),
+        (".01 .3 .5 1 1 {:curve []} env.adsr", "needs one or more curves"),
+    ],
+)
+def test_error_leaves_process_running(code, message, sapf_bin, tmp_path):
+    """Each once crashed the process; run_sapf fails on a non-zero exit. A go thread's error leaves the file running."""
+    out = run_sapf(f'{code}\n"alive" pr', tmp_path)
+    assert message in out, out
+    assert ("alive" in out) == (" go " in code), out
+
+
+def test_overflow_backtrace_is_capped(sapf_bin, tmp_path):
+    out = run_sapf("0 = g \\[g] = g g", tmp_path)
+    assert out.count("backtrace: opCallWorkspaceVar") == 20, out
+    assert "more frames" in out, out

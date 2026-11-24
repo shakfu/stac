@@ -12,6 +12,8 @@
 #define SAPF_RESOURCES_HPP
 
 #include "VM.hpp"
+#include <memory>
+#include <string>
 
 class ServerResource : public Object
 {
@@ -42,9 +44,10 @@ struct SampleInfo {
 	int channels;
 	int64_t frames;
 	std::string absolute;
+	std::shared_ptr<void> slot;  // keeps buf for this file while held
 };
 SampleInfo sampleBuffer(Thread& th, Arg path, const char* msg);
-// Frees the sound-file buffer `buf` for another file (Samples.cpp).
-void releaseSampleBuffer(int buf);
+// Drops a hold on a sound-file slot; true if nothing else holds it, so its buffer can be freed.
+bool releaseSampleSlot(std::shared_ptr<void>& slot);
 
 #endif

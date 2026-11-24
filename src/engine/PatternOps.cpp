@@ -170,6 +170,9 @@ struct Events {
 	bool absolute;
 	LoadedTables loaded;
 	std::map<std::string, std::string> funDefs; // a function's def compiled as "v": its name
+	// Past this many, a new graph's def is freed by the event that uses it, so a stream of varying
+	// values does not fill scsynth's def table (1024).
+	static constexpr size_t kMaxFunDefs = 64;
 
 	Events(Thread& inTh, Arg stream, bool live) : th(inTh), absolute(live) { events.set(stream); }
 
@@ -257,7 +260,7 @@ struct Events {
 					if (!x.isReal() && !asResource(x)) wrongType("event : out", "Real or Bus", x);
 					bus = (int)x.asFloat();
 				}
-				out.push_back({start, synthOf(fun, bus, [&](std::string const& k) -> V {
+				for (std::string& m : synthOf(fun, bus, [&](std::string const& k) -> V {
 					if (k == "freq") return freq();
 					if (k == "amp" && !has("amp")) return .1;
 					if (k == "dur") return dur;
@@ -268,7 +271,8 @@ struct Events {
 						throw errNotFound;
 					}
 					return at(k);
-				})});
+				}))
+					out.push_back({start, std::move(m)});
 				continue;
 			}
 			std::vector<OscArg> controls;
@@ -285,6 +289,7 @@ struct Events {
 			if (param("freq") && !has("freq")) send("freq", freq());
 			if (param("amp") && !has("amp")) send("amp", .1);
 			int id = newNodeID();
+			if (absolute) holdWhilePlaying(id, def->mSlots);
 			std::vector<OscArg> args = {{OscArg::String, 0, def->mName}, {OscArg::Int, id, ""}, {OscArg::Int, 0, ""},
 				{OscArg::Int, 0, ""}};
 			args.insert(args.end(), controls.begin(), controls.end());
@@ -298,8 +303,9 @@ struct Events {
 
 	// A function instrument's synth, writing to bus: fun called with each argument's value, as ola calls a voice.
 	// Synths that compile alike share a def. Their channels must end, as an ola voice's do.
+	// The /s_new for a function instrument, then a /d_free of its def if that is not kept.
 	template <class Value>
-	std::string synthOf(V fun, int bus, Value value)
+	std::vector<std::string> synthOf(V fun, int bus, Value value)
 	{
 		V channels;
 		{
@@ -316,13 +322,20 @@ struct Events {
 		}
 		for (std::string const& m : loadWavetables(th, channels, loaded)) loads.push_back(m);
 		for (std::string const& m : loadSamples(th, channels, loaded, absolute)) loads.push_back(m);
-		std::string& name = funDefs[compileSynthDef(th, channels, "v", bus)];
-		if (name.empty()) {
-			name = "sapf-event-" + std::to_string(++gEventDefs);
+		std::string key = compileSynthDef(th, channels, "v", bus);
+		auto it = funDefs.find(key);
+		bool kept = it != funDefs.end() || funDefs.size() < kMaxFunDefs;
+		std::string name = it != funDefs.end() ? it->second : "sapf-event-" + std::to_string(++gEventDefs);
+		if (it == funDefs.end()) {
+			if (kept) funDefs[key] = name;
 			loads.push_back(oscMessage("/d_recv", {{OscArg::Blob, 0, compileSynthDef(th, channels, name, bus)}}));
 		}
-		return oscMessage("/s_new", {{OscArg::String, 0, name}, {OscArg::Int, newNodeID(), ""}, {OscArg::Int, 0, ""},
-			{OscArg::Int, 0, ""}});
+		int node = newNodeID();
+		if (absolute) holdWhilePlaying(node, slotsOf(th, channels));  // live; a score's synths are not
+		std::vector<std::string> out = {oscMessage("/s_new", {{OscArg::String, 0, name}, {OscArg::Int, node, ""},
+			{OscArg::Int, 0, ""}, {OscArg::Int, 0, ""}})};
+		if (!kept) out.push_back(defFree(name));
+		return out;
 	}
 };
 
@@ -421,12 +434,18 @@ public:
 	}
 };
 
+std::atomic<int> gStreams{0};  // run threads; start counts one before starting it
+
 void run(std::shared_ptr<Thread> th, V stream, std::shared_ptr<ClockState> clock, double startBeat,
 	std::shared_ptr<PlayState> state)
 {
+	struct Running {
+		~Running() { --gStreams; }
+	} running;
+	Events events(*th, stream, true);
+	std::vector<Timed> msgs;
+	double last = 0.;  // the time of the last bundle sent
 	try {
-		Events events(*th, stream, true);
-		std::vector<Timed> msgs;
 		size_t sentDefs = 0;
 		// each event sees the bindings published before it, one version throughout
 		for (double beat = startBeat; state->live() && beat < state->stopBeat && (th->refreshWorkspace(), events.next(msgs));
@@ -434,7 +453,7 @@ void run(std::shared_ptr<Thread> th, V stream, std::shared_ptr<ClockState> clock
 			if (events.tempo > 0.) clock->setTempoAt(beat, events.tempo);
 			for (; sentDefs < events.defs.size(); ++sentDefs) {
 				Def* d = events.defs[sentDefs];
-				if (!d->mSent) checkServer(scsynthSendSync({d->recv()}), d->mName.c_str());
+				if (!d->mSent) checkServer(scsynthSendSync(d->recvWithLoads()), d->mName.c_str());
 				d->mSent = true;
 			}
 			if (!events.loads.empty()) checkServer(scsynthSendSync(events.loads), "play");
@@ -443,13 +462,25 @@ void run(std::shared_ptr<Thread> th, V stream, std::shared_ptr<ClockState> clock
 			for (double left; (left = clock->secondsAt(beat) - kLookahead - scsynthNow()) > 0 && state->live();)
 				std::this_thread::sleep_for(std::chrono::duration<double>(std::min(left, .05)));
 			if (!state->live() || beat >= state->stopBeat) break;
-			for (Timed const& m : msgs)
+			for (Timed const& m : msgs) {
+				last = std::max(last, clock->secondsAt(startBeat + m.beats));
 				scsynthSend(oscBundle(clock->secondsAt(startBeat + m.beats), {m.msg}, true));
+			}
 			msgs.clear();
 		}
 	} catch (...) {
-		post("play : stopped; an event failed\n");
+		postError(*th, "play : stopped");
 	}
+	// The stream's defs, after its last bundle: equal time tags run in the order they arrive.
+	// An event sent no /s_new still frees an uncached def its /d_recv loaded.
+	std::vector<std::string> frees;
+	for (auto const& [key, name] : events.funDefs) frees.push_back(defFree(name));
+	for (Timed const& m : msgs)
+		if (m.msg.compare(0, 7, "/d_free") == 0) frees.push_back(m.msg);
+	if (frees.empty()) return;
+	// stop's /clearSched may drop a timed bundle; it frees the synths, so the defs can go now
+	if (state->generation != gGeneration) scsynthSend(oscImmediate(frees));
+	else scsynthSend(oscBundle(std::max(last, scsynthNow()), frees, true));
 }
 
 // Starts stream at startBeat, or as soon as the lookahead allows when it is nan.
@@ -458,6 +489,7 @@ P<Player> start(Thread& th, Arg stream, std::shared_ptr<ClockState> clock, doubl
 	if (std::isnan(startBeat)) startBeat = clock->beatsAt(scsynthNow() + kLookahead);
 	auto state = std::make_shared<PlayState>();
 	state->clock = clock;
+	++gStreams;
 	std::thread(run, std::make_shared<Thread>(th), V(stream), clock, startBeat, state).detach();
 	return new Player(state);
 }
@@ -762,7 +794,8 @@ void ndef_(Thread& th, Prim* prim)
 	// The new synth starts as the old one is released, so their fades overlap. A first run, or a
 	// run after end or stop, starts the monitor too.
 	int node = newNodeID();
-	std::vector<std::string> msgs = {sendFade(node, nd->mFadeTime, defName, 0, nd->mBus)};
+	holdWhilePlaying(node, slotsOf(th, channels));
+	std::vector<std::string> msgs = {sendFade(node, nd->mFadeTime, defName, 0, nd->mBus), defFree(defName)};
 	if (nd->mNode >= 0) msgs.push_back(releaseFade(nd->mNode));
 	else if (nd->mMonitor < 0 && nd->mRate == rateAR) msgs.push_back(nd->monitorMsgs(th, packets));
 	checkServer(scsynthSendSync(packets), "ndef");
@@ -885,6 +918,18 @@ void stopEventStreams()
 {
 	++gGeneration;
 	for (auto& [name, nd] : gNdefs) nd->mNode = nd->mMonitor = -1;
+}
+
+bool stopPlayers(double seconds)
+{
+	stopTextures();
+	stopEventStreams();
+	auto deadline = std::chrono::steady_clock::now() + std::chrono::duration<double>(seconds);
+	while (gStreams > 0 || runningTextures() > 0) {
+		if (std::chrono::steady_clock::now() > deadline) return false;
+		std::this_thread::sleep_for(std::chrono::milliseconds(5));
+	}
+	return true;
 }
 
 void AddPatternOps();

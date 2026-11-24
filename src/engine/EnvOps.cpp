@@ -137,6 +137,10 @@ V arith(Thread& th, BinaryOp* op, double identity, V a, Arg b)
 std::vector<V> popCurves(Thread& th, const char* msg)
 {
 	std::vector<V> cs = items(th, popCurve(th, msg));
+	if (cs.empty()) {
+		post("%s : needs one or more curves\n", msg);
+		throw errOutOfRange;
+	}
 	for (Arg c : cs)
 		if (c.isString()) shapeNumber(c, msg);
 	return cs;

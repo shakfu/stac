@@ -1044,13 +1044,12 @@ static void play_(Thread& th, Prim* prim)
 	auto loaded = std::make_shared<LoadedTables>();
 	std::vector<std::string> packets = loadWavetables(th, channels, *loaded);
 	for (std::string const& m : loadSamples(th, channels, *loaded, true)) packets.push_back(m);
-	packets.push_back(oscMessage("/d_recv", {{OscArg::Blob, 0, def}, {OscArg::Blob, 0, snew}}));
+	// the def is freed as the synth starts, so a session's plays do not fill scsynth's def table
+	packets.push_back(oscMessage("/d_recv", {{OscArg::Blob, 0, def}, {OscArg::Blob, 0, oscImmediate({snew, defFree(name)})}}));
+	holdWhilePlaying(node, slotsOf(th, channels));
 	std::string err = scsynthSendSync(packets);
-	if (!err.empty()) {
-		post("play : scsynth at %s: %s. Start one with 'make server' or set STAC_SCSYNTH.\n",
-			scsynthAddress().c_str(), err.c_str());
-		throw errFailed;
-	}
+	if (!err.empty()) scsynthNodeEnded(node);  // never started
+	checkServer(err, "play");
 	playTextures(th, channels, scsynthNow() + .2, loaded, node);
 	th.push(V(new Node(node)));
 }

@@ -12,6 +12,8 @@
 #include "Graph.hpp"
 #include "Namespace.hpp"
 #include "symbol.hpp"
+#include "Samples.hpp"
+#include "Wavetables.hpp"
 #include <algorithm>
 #include <cstring>
 #include <fstream>
@@ -24,7 +26,8 @@
 
 namespace {
 
-int gNextNode = 3000000 + (int)(getpid() % 1000) * 100000;
+// Main, pattern and ola threads all take IDs.
+std::atomic<int> gNextNode{3000000 + (int)(getpid() % 1000) * 100000};
 
 } // namespace
 
@@ -33,8 +36,9 @@ int newNodeID() { return gNextNode++; }
 void checkServer(const std::string& err, const char* word)
 {
 	if (err.empty()) return;
-	post("%s : scsynth at %s: %s. Start one with 'make server' or set STAC_SCSYNTH.\n", word,
-		scsynthAddress().c_str(), err.c_str());
+	// a /fail reply names its command; anything else means no server answered
+	const char* hint = err[0] == '/' ? "" : " Start one with 'make server' or set STAC_SCSYNTH.";
+	post("%s : scsynth at %s: %s.%s\n", word, scsynthAddress().c_str(), err.c_str(), hint);
 	throw errFailed;
 }
 
@@ -128,6 +132,14 @@ void synthdef_(Thread& th, Prim* prim)
 	}
 	if (writes) parts.outBus = outParam;
 	def->mBytes = compileDef(th, results.empty() ? V(new List(itemTypeV, 0)) : channels, def->mName, parts);
+	// what the body reads, through its channels or the roots it made
+	P<List> all = new List(itemTypeV, (int64_t)(results.size() + parts.roots.size()));
+	for (Arg r : results) all->add(r);
+	for (auto const& r : parts.roots) all->add(V(new Root(r)));
+	def->mSlots = slotsOf(th, V(all));
+	LoadedTables loaded;
+	def->mLoads = loadWavetables(th, V(all), loaded);
+	for (std::string& m : loadSamples(th, V(all), loaded, true)) def->mLoads.push_back(std::move(m));
 	th.push(V(def));
 }
 

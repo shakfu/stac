@@ -6,6 +6,7 @@
 //    (at your option) any later version.
 
 #include "Texture.hpp"
+#include "Def.hpp"
 #include "Namespace.hpp"
 #include "Resources.hpp"
 #include "Scsynth.hpp"
@@ -106,14 +107,14 @@ struct Voices {
 
 std::string voiceName() { return "sapf-voice-" + std::to_string(++gVoiceCount); }
 
-std::string newSynth(const std::string& name, int addAction)
+// node -1: scsynth picks the ID
+std::string newSynth(const std::string& name, int addAction, int node = -1)
 {
-	return oscMessage("/s_new", {{OscArg::String, 0, name}, {OscArg::Int, -1, ""}, {OscArg::Int, addAction, ""},
+	return oscMessage("/s_new", {{OscArg::String, 0, name}, {OscArg::Int, node, ""}, {OscArg::Int, addAction, ""},
 		{OscArg::Int, 0, ""}});
 }
 
 std::string defRecv(const std::string& def) { return oscMessage("/d_recv", {{OscArg::Blob, 0, def}}); }
-std::string defFree(const std::string& name) { return oscMessage("/d_free", {{OscArg::String, 0, name}}); }
 
 // Each voice's def goes ahead of its start, and the bundle that starts it frees the def; the
 // synth keeps it. scsynth starts a synth at the start of the block holding its bundle's time.
@@ -148,12 +149,14 @@ void schedule(std::shared_ptr<Thread> th, P<Texture> tx, double startTime, int g
 				gPending.erase(std::remove_if(gPending.begin(), gPending.end(),
 					[now](auto const& p) { return p.second < now; }), gPending.end());
 				gPending.emplace_back(name, startTime + seconds);
+				int node = newNodeID();  // a voice may outlive its main synth, so it holds its own slots
+				holdWhilePlaying(node, slotsOf(*th, out));
 				scsynthSend(defRecv(def));
-				scsynthSend(oscBundle(startTime + seconds, {newSynth(name, 0), defFree(name)}, true));
+				scsynthSend(oscBundle(startTime + seconds, {newSynth(name, 0, node), defFree(name)}, true));
 			}
 		}
 	} catch (...) {
-		post("ola : stopped; a voice failed\n");
+		postError(*th, "ola : stopped");
 	}
 }
 

@@ -1,0 +1,8 @@
+# scsynth's lock-free FIFOs, sync conditions and audio drivers synchronize in ways TSan does not
+# model. A pattern matches a substring of a function, file or module name in either access's
+# stack, so a race between stac code and scsynth's is suppressed too.
+race:SC_
+race:MsgFifo.h
+race:_UGens
+race:CoreAudio
+race:pa_

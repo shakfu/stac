@@ -13,6 +13,7 @@
 #define SAPF_GRAPH_HPP
 
 #include "VM.hpp"
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -61,6 +62,7 @@ public:
 	P<Object> wavetable;     // set on osc's VOsc: the tables it reads, from buffer tableBuf
 	int tableBuf = -1;
 	P<Object> sample;        // set on sf>'s and playbuf's PlayBuf: the sound file it reads into tableBuf
+	std::shared_ptr<void> slot;  // keeps tableBuf's slot from another table or file while this node exists
 	int spec = -1;           // row of kSpecUGens for a generated UGen word (SpecUGens.cpp)
 	P<UGenNode> doneCopy;    // .done's copy, shared by all outputs of a multi-output node
 	std::vector<V> krInputs; // inputs before the ar method raised them to audio rate; .kr uses these
@@ -151,8 +153,9 @@ struct DefParts {
 	std::vector<P<UGenNode>> roots;
 };
 
-// While set, UGens with no outputs are added to it as they are made (outputsOf).
-extern std::vector<P<UGenNode>>* gDefRoots;
+// While set, UGens with no outputs are added to it as they are made (outputsOf). Per thread, so a
+// pattern or ola thread's UGens stay out of the main thread's synthdef.
+extern thread_local std::vector<P<UGenNode>>* gDefRoots;
 
 // As compileSynthDef, for a def: channels may be empty when parts has roots.
 std::string compileDef(Thread& th, Arg channels, const std::string& name, DefParts const& parts);
@@ -181,5 +184,8 @@ std::vector<UGenNode*> wavetableNodesOf(Thread& th, Arg channels);
 
 // The PlayBuf nodes of sf> and playbuf that the channels read.
 std::vector<UGenNode*> sampleNodesOf(Thread& th, Arg channels);
+
+// The wave-table and sound-file slots the channels read: a synth playing them holds these.
+std::vector<std::shared_ptr<void>> slotsOf(Thread& th, Arg channels);
 
 #endif

@@ -10,6 +10,7 @@
 #include "Scsynth.hpp"
 #include "MathFuns.hpp"
 #include <algorithm>
+#include <memory>
 #include <cmath>
 
 namespace {
@@ -23,24 +24,33 @@ const int kHarmonics[kNumTables] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 16, 20, 2
 // Buffers for wave tables, above the ones a user is likely to allocate; scsynth has 1024 by default.
 const int kFirstBuf = 512, kLastBuf = 1024;
 
-std::mutex gBufMutex;
-// Each wave table keeps its buffers; holding the List keeps its address from being reused.
-std::vector<std::pair<P<List>, int>> gBufs;
-int gNextBuf = kFirstBuf;
+// A table's kNumTables buffers. Taken while a graph that reads them exists or a synth plays them;
+// holding the List keeps its address from matching another table's.
+struct TableSlot {
+	P<List> table;
+	int buf;
+};
 
-int bufferFor(P<List> const& table)
+const int kTableSlots = (kLastBuf - kFirstBuf) / kNumTables;
+std::mutex gBufMutex;
+std::vector<std::weak_ptr<TableSlot>> gSlots(kTableSlots);
+
+std::shared_ptr<TableSlot> slotFor(P<List> const& table)
 {
 	std::lock_guard<std::mutex> lock(gBufMutex);
-	for (auto& b : gBufs)
-		if (b.first() == table()) return b.second;
-	if (gNextBuf + kNumTables > kLastBuf) {
-		gNextBuf = kFirstBuf;
-		gBufs.clear();
+	int empty = -1;
+	for (int i = 0; i < kTableSlots; ++i) {
+		std::shared_ptr<TableSlot> s = gSlots[i].lock();
+		if (s && s->table() == table()) return s;
+		if (!s && empty < 0) empty = i;
 	}
-	int buf = gNextBuf;
-	gNextBuf += kNumTables;
-	gBufs.push_back({table, buf});
-	return buf;
+	if (empty < 0) {
+		post("osc : more than %d wave tables in use\n", kTableSlots);
+		throw errOutOfRange;
+	}
+	auto s = std::make_shared<TableSlot>(TableSlot{table, kFirstBuf + empty * kNumTables});
+	gSlots[empty] = s;
+	return s;
 }
 
 // sapf's fillWaveTable as its code describes it: harmonic k + 1 is
@@ -149,7 +159,8 @@ static void osc_(Thread& th, Prim* prim)
 	double phase = th.popFloat("osc : phase");
 	V freq = popGraphIn(th, "osc : freq");
 	if (!isWavetable(table)) wrongType("osc : wavetable", "wave table from wavefill or sawTbl", table);
-	int buf = bufferFor((List*)table.o());
+	std::shared_ptr<TableSlot> slot = slotFor((List*)table.o());
+	int buf = slot->buf;
 
 	V sr = makeUGen("SampleRate", rateIR, {});
 	V limit = graphBinary(th, opMin, graphBinary(th, opMul, sr, .5), 24000.);
@@ -166,6 +177,7 @@ static void osc_(Thread& th, Prim* prim)
 	UGenNode* node = ((Sig*)out.o())->node();
 	node->wavetable = table.o();
 	node->tableBuf = buf;
+	node->slot = slot;
 	th.push(out);
 }
 

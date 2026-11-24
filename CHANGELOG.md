@@ -35,6 +35,8 @@
 
 ### Added
 
+- A CI job runs ctest and pytest under ASan with UBSan, and under TSan, on Linux. Suppressions for scsynth and for upstream sapf's deliberate integer wrapping are in `tests/sanitizers/`. Tests marked `timing` assert wall-clock gaps that the sanitizers' slowdown breaks, and the job deselects them.
+
 - A CLAP instrument, `build/examples/clap/stac.clap`, after sapf's: an editor and loopback UDP input, with scsynth inside the plugin ([examples/clap/README.md](examples/clap/README.md)). On Linux, install it with the folder `stac/` beside it, which holds the UGens and the bundled modules. The host's audio callback renders scsynth through a driver that opens no device. Its clock counts rendered frames, so bundle times follow the host's audio, not the wall clock. A driver inside libscsynth over a ring buffer from scsynth's own device thread: it adds no latency and needs no device. `make editor` opens it in a minimal host. It needs X11 and OpenGL headers on Linux; `-DSTAC_BUILD_CLAP=OFF` skips it.
 
   Host-driven, stopping scsynth keeps the UGen plugins loaded. Unloading them, as `quit` does, crashed the next World a host started: its units called the unmapped code.
@@ -123,6 +125,28 @@
 - A file run without `-i` warns when values are left on the stack at its end. A missing argument otherwise passes silently: a dropped `osc` made `>nrt` write a score of the wrong value. The warning is at the end of the run, not in `>nrt`, because the REPL keeps values on the stack on purpose.
 
 ### Fixed
+
+- Three inputs killed the process, and with it every pattern and the embedded scsynth. An error inside `go` left its thread uncaught, which calls `std::terminate`. Unbounded recursion overflowed the C stack, which is 512 KB on a macOS thread. An empty curve list, as in `{:curve []} env.perc`, took a remainder by zero. Each now raises an error: `go : error: ...`, `stack overflow` past 384 KB of nested calls on every platform, and `needs one or more curves`. A backtrace keeps its innermost 20 frames. `play` and `ola` threads now print the error that stopped them, not only "an event failed".
+
+- `ctest`'s `unit_tests_txt` passed if any case printed "Passed"; it now fails on `FAILED` or `error:`, as the other file tests do.
+
+- Pattern threads raced the main thread on three globals. Node IDs came from a plain `int`, so two threads could take the same ID; scsynth rejects the second `/s_new`. The root collector for UGens with no outputs was process-wide, so a function instrument's `sendtrig` could land in a `synthdef` the main thread was compiling. A def's sent flag was a plain `bool`. The first two are atomic and per thread now, the flag atomic. `tests/py/test_threads.py` exercises them; TSan reports each without the fix.
+
+- `quit` while a pattern played could segfault: `exit` destroyed the scale table before the `atexit` handler stopped the pattern thread that read it. The REPL and a file run now stop event streams and `ola` schedulers, and wait up to 2 s for their threads, before exiting. The CLAP plugin's deactivate waits the same way, so no player posts to a destroyed plugin.
+
+- Wave-table and sound-file buffers were never given back. The 18th distinct wave table wrapped to buffers 512..541 and overwrote the first while synths still read it, and within one `play` it was never loaded. After 64 distinct sound files, `sf>` and `playbuf` failed for the rest of the session. A table's or file's buffers are now taken while a graph or `Buffer` that reads it exists, or a synth plays it, and return when the server reports the synth's end; stac registers for scsynth's node notifications to see that. With every slot taken, `osc` and `sf>` raise an error instead of overwriting. Freeing when the last user ends over reusing the oldest slot, which would overwrite a buffer a long synth still plays. A server that sends no notifications leaves the buffers taken, as before.
+
+  `buffer.free` of a file another synth or graph still reads no longer frees that buffer under it.
+
+- A `synthdef` whose body used `osc`, `sf>` or `playbuf` never loaded its wave tables or sound files, so its synths read whatever those buffers held. The def now sends them with its first `/d_recv`.
+
+- Over UDP on macOS, a packet over 9216 bytes failed to send, the system's default UDP send buffer: every `osc` through `STAC_SCSYNTH` failed, as its tables load in 41 KB packets, and the error blamed a 64 KB def. stac's sockets now raise their send buffer to 64 KB, as on Linux.
+
+- With the embedded server, threads took each other's replies. Every caller emptied one shared reply queue and took the first `/synced` or `/fail` in it, under a fixed sync ID. A `set` on a freed node could lose its error, a `play` could report another thread's `/fail`, and a pattern could stop on a `/fail` that was not its own. Each call now sends on its own reply channel, which scsynth answers to, and the `/sync` ID is that channel; replies to fire-and-forget sends are dropped. A server error such as "Node not found" no longer suggests starting a server.
+
+- After about 1024 `play`s, `ndef` runs or function-instrument graphs, every new synth failed with "SynthDef not found" until restart. Each made a def that was never freed, and scsynth's def table holds 1024 and cannot grow. `play` and `ndef` now free a def in the bundle that starts its synth; scsynth keeps a def while synths use it. A pattern frees its function-instrument defs after its last event. It keeps 64 of them for reuse; past that, each new graph's def is freed with the event that uses it. Freeing over raising scsynth's limit, which would only defer the failure.
+
+- `perms` and `permz` read one element before their order array after the last permutation, and for a list of 0 or 1 items. They step with `std::next_permutation` now; the order is unchanged. Found by ASan.
 
 - `stop` left up to two `ola` voice defs on scsynth each time. A voice's `/d_free` is in its start bundle, sent .2 s ahead; `/clearSched` dropped the pending bundles after their `/d_recv` had loaded the defs. `stop` now frees the defs of voices that had not started. A voice sent while `stop` ran could also land after `/clearSched` and start after the stop; sending a voice and `stop` now take one lock.
 

@@ -121,9 +121,9 @@ How the sapf words map onto scsynth:
 
 - **Files.** `>sd` writes a `.scsyndef`, `>sf` renders a `.wav` until the first channel ends, `>sfo` then opens it, and `>nrt` writes an NRT score with every `ola` voice. The SSP's `scsy` plays a `>nrt` score: its voices start on schedule and the score loops at its length.
 
-- **Wave tables.** `wavefill`, `sawTbl` and the other table words make 30 third-octave tables; `osc` plays them with `VOsc` over buffers 512 upward. `play` and `>nrt` load the buffers.
+- **Wave tables.** `wavefill`, `sawTbl` and the other table words make 30 third-octave tables; `osc` plays them with `VOsc` over buffers 512 upward, 17 tables at a time. `play`, `synthdef` and `>nrt` load the buffers. A table's buffers are taken while a graph that reads it exists or a synth plays it.
 
-- **Samples.** `sf>` and `playbuf` play a WAV or AIFF file with `PlayBuf` from buffers 0..63. `>sd` names the files in the def's sidecar, `name.txt`, for `scsy`.
+- **Samples.** `sf>` and `playbuf` play a WAV or AIFF file with `PlayBuf` from buffers 0..63, taken as wave tables' are. `>sd` names the files in the def's sidecar, `name.txt`, for `scsy`.
 
 ## Build and test
 
@@ -139,11 +139,11 @@ make editor                      # the CLAP plugin's editor in a minimal host
 
 The first build downloads SuperCollider 3.14.1's source and libsndfile 1.2.2 as pinned release tarballs, checked by SHA-256, and builds scsynth's library and core UGens with them; `cmake/EmbeddedScsynth.cmake` says how to build offline. Tested on macOS and Linux; Linux needs ALSA's headers (`libasound2-dev` or `alsa-lib-devel`). `-DSAPF_EMBED_SCSYNTH=OFF` builds without scsynth, for a server over UDP only. `-DSAPF_TREESITTER=OFF` builds without syntax highlighting.
 
-`make test` runs the C++ unit tests (interpreter, parser, completion, highlighting) and the pytest suites in `tests/py`. CI (`.github/workflows/build.yml`) runs both on macOS and Ubuntu each push. Among the suites:
+`make test` runs the C++ unit tests (interpreter, parser, completion, highlighting) and the pytest suites in `tests/py`. CI (`.github/workflows/build.yml`) runs both on macOS and Ubuntu each push, and again on Ubuntu under ASan with UBSan and under TSan, with the suppressions in `tests/sanitizers/`. Among the suites:
 
 - `test_scgf_parity.py` and `test_ugen_sweep.py`: stac's SynthDef bytes equal [nanosynth](../nanosynth)'s for the same graph.
 
-- `test_compilers.py`: gcc and clang builds write the same defs for every `play` in `examples/sapf.stac`. `STAC_OTHER` names the second build; without it, the build is compared with itself, for determinism.
+- `test_compilers.py`: gcc and clang builds write the same defs for every `play` in `examples/sapf.stac`. `STAC_OTHER` names the second build; without it, that test skips. A second test checks that two runs of one build write the same defs.
 
 - `test_conformance.py`: scsynth renders sapf expressions offline, compared with original sapf's renders in `tests/fixtures/ref`.
 

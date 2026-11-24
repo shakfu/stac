@@ -16,7 +16,6 @@
 #include "Environment.hpp"
 #include "Patterns.hpp"
 #include "Scsynth.hpp"
-#include "Texture.hpp"
 #include "VM.hpp"
 #include "sapf/Engine.hpp"
 
@@ -241,11 +240,11 @@ public:
 private:
 	static StacPlugin* self(const clap_plugin_t* p) { return static_cast<StacPlugin*>(p->plugin_data); }
 
-	// Players first, so none sends to the stopped World; stopping it frees the synths.
+	// Players first, so none sends to the stopped World or posts after destroy; stopping the World
+	// frees the synths. A player wakes within 50 ms, unless a send to the server is waiting.
 	static void Deactivate()
 	{
-		stopTextures();
-		stopEventStreams();
+		stopPlayers(2.);
 		stopHostDrivenScsynth();
 	}
 

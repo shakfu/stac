@@ -299,9 +299,11 @@ void Thread::run(Opcode* opc)
 			}
 		}
 	} catch (...) {
-		th.mBacktrace += std::string("backtrace: ") + opcode_name[opc->op] + " ";
-		opc->v.printShort(th, th.mBacktrace);
-		th.mBacktrace += "\n";
+		if (++th.mBacktraceFrames <= kMaxBacktraceFrames) {
+			th.mBacktrace += std::string("backtrace: ") + opcode_name[opc->op] + " ";
+			opc->v.printShort(th, th.mBacktrace);
+			th.mBacktrace += "\n";
+		}
 		throw;
 	}
 }

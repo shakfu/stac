@@ -11,12 +11,14 @@
 #ifndef SAPF_DEF_HPP
 #define SAPF_DEF_HPP
 
+#include <atomic>
 #include "Resources.hpp"
 #include "Environment.hpp"
 #include "Scsynth.hpp"
 #include <algorithm>
 #include <cstring>
 #include <fstream>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -109,7 +111,11 @@ public:
 	std::string mName;
 	std::string mBytes;
 	std::vector<std::string> mParams;
-	bool mSent = false;
+	std::atomic<bool> mSent{false};  // set by the main thread and by pattern threads
+	// The wave tables and sound files the body reads: their slots, held while the def exists and by
+	// each synth it starts, and the messages that load them, sent with the def.
+	std::vector<std::shared_ptr<void>> mSlots;
+	std::vector<std::string> mLoads;
 
 	virtual const char* TypeName() const override { return "SynthDef"; }
 
@@ -126,6 +132,14 @@ public:
 		std::vector<OscArg> args = {{OscArg::Blob, 0, mBytes}};
 		if (!completion.empty()) args.push_back({OscArg::Blob, 0, completion});
 		return oscMessage("/d_recv", args);
+	}
+
+	// The buffer loads, then /d_recv.
+	std::vector<std::string> recvWithLoads(const std::string& completion = "")
+	{
+		std::vector<std::string> out = mLoads;
+		out.push_back(recv(completion));
+		return out;
 	}
 
 	// {...} NAME: starts a synth with the Form's controls. :target and :addAction place it.
@@ -152,8 +166,11 @@ public:
 			{OscArg::Int, target, ""}};
 		args.insert(args.end(), pairs.begin(), pairs.end());
 		std::string snew = oscMessage("/s_new", args);
+		holdWhilePlaying(id, mSlots);
 		// sent with its first synth: scsynth starts the synth when the def has loaded
-		checkServer(scsynthSendSync({mSent ? snew : recv(snew)}), mName.c_str());
+		std::string err = scsynthSendSync(mSent ? std::vector<std::string>{snew} : recvWithLoads(snew));
+		if (!err.empty()) scsynthNodeEnded(id);
+		checkServer(err, mName.c_str());
 		mSent = true;
 		th.push(V(new Node(id)));
 	}
@@ -163,7 +180,7 @@ public:
 		const char* name = symbolOf(key);
 		if (!name) return false;
 		if (!strcmp(name, "add")) {
-			checkServer(scsynthSendSync({recv()}), (mName + ".add").c_str());
+			checkServer(scsynthSendSync(recvWithLoads()), (mName + ".add").c_str());
 			mSent = true;
 		} else if (!strcmp(name, "write")) {
 			const char* dir = stacEnv("SYNTHDEFS");

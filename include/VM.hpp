@@ -143,10 +143,13 @@ struct Rate
 };
 
 const size_t kStackSize = 16384;
+// C stack that nested Fun calls may use: 3/4 of a macOS std::thread's 512 KB, on every platform alike
+const ptrdiff_t kMaxCallStack = 384 * 1024;
 
 class CompileScope;
 
 const int kMaxTokenLen = 2048;
+const int kMaxBacktraceFrames = 20;
 
 enum {
 	parsingWords,
@@ -179,7 +182,11 @@ public:
 	std::map<std::string, V> mImported;  // what this thread's imports bound; a module's stay private
 	// The frames an error unwound through, printed only if nothing catches it (flushBacktrace).
 	std::string mBacktrace;
+	int mBacktraceFrames = 0;  // frames unwound, of which mBacktrace keeps the innermost kMaxBacktraceFrames
 	void flushBacktrace();
+	void clearBacktrace() { mBacktrace.clear(); mBacktraceFrames = 0; }
+	int mCallDepth = 0;          // nested Fun calls; copies start at 0
+	char* mStackTop = nullptr;   // the C stack where the outermost call began
 
 	P<CompileScope> mCompileScope;
 
@@ -610,6 +617,8 @@ public:
 uint64_t timeseed();
 // Runs a file. False if it could not be opened or compiled, or failed with an error.
 bool loadFile(Thread& th, const char* filename);
+// Posts the exception being handled, prefixed "who : "; call only inside a catch block.
+void postError(Thread& th, const char* who);
 
 
 class UseRate

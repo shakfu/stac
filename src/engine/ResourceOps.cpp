@@ -128,10 +128,11 @@ public:
 	int mChannels;
 	int64_t mFrames;
 	bool mFile;  // a sound file's buffer, 0..63, from buffer.read
+	std::shared_ptr<void> mSlot;  // the file's slot, which a synth playing it may share
 	bool mFreed = false;
 
-	Buffer(int index, int channels, int64_t frames, bool file = false)
-		: ServerResource(index), mChannels(channels), mFrames(frames), mFile(file) {}
+	Buffer(int index, int channels, int64_t frames, bool file = false, std::shared_ptr<void> slot = nullptr)
+		: ServerResource(index), mChannels(channels), mFrames(frames), mFile(file), mSlot(std::move(slot)) {}
 	virtual const char* TypeName() const override { return "Buffer"; }
 	using Object::print;
 	virtual void print(Thread& th, std::string& out, int depth) override
@@ -149,9 +150,10 @@ public:
 			post("free : buffer %d is already free\n", mIndex);
 			throw errFailed;
 		}
-		checkServer(scsynthSendSync({oscMessage("/b_free", {{OscArg::Int, mIndex, ""}})}), "free");
-		if (mFile) releaseSampleBuffer(mIndex);
-		else gDataBufs.give(mIndex);
+		// a file's buffer stays loaded while a synth or graph still reads it
+		if (!mFile || releaseSampleSlot(mSlot))
+			checkServer(scsynthSendSync({oscMessage("/b_free", {{OscArg::Int, mIndex, ""}})}), "free");
+		if (!mFile) gDataBufs.give(mIndex);
 		mFreed = true;
 		ioValue = noValue();
 		return true;
@@ -224,7 +226,7 @@ void read_(Thread& th, Prim* prim)
 	SampleInfo s = sampleBuffer(th, th.pop(), "buffer.read");
 	checkServer(scsynthSendSync({oscMessage("/b_allocRead", {{OscArg::Int, s.buf, ""}, {OscArg::String, 0, s.absolute}})}),
 		"buffer.read");
-	th.push(V(new Buffer(s.buf, s.channels, s.frames, true)));
+	th.push(V(new Buffer(s.buf, s.channels, s.frames, true, s.slot)));
 }
 
 void load_(Thread& th, Prim* prim)
@@ -311,7 +313,7 @@ void AddResourceOps()
 	// SC's Buffer class methods; the buffer UGens are in sc.
 	vm.addBifHelp(std::string("\n*** buffer ***"));
 	P<Namespace> ns = new Namespace("buffer");
-	ns->addPrim("read", 1, read_, "(path --> buffer) reads a WAV or AIFF file into one of the sound-file buffers 0..63. buffer.free frees it.");
+	ns->addPrim("read", 1, read_, "(path --> buffer) reads a WAV or AIFF file into one of the sound-file buffers 0..63. .free frees it once no synth or graph reads the file.");
 	ns->addPrim("load", 1, load_, "(list --> buffer) a one-channel buffer holding the list's values.");
 	ns->addPrim("alloc", 2, alloc_, "(frames channels --> buffer) an empty buffer.");
 	vm.def("buffer", V(ns));

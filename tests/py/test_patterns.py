@@ -11,7 +11,7 @@ import threading
 import time
 
 import pytest
-from nanosynth.osc import OscMessage
+from nanosynth.osc import OscBundle, OscMessage
 
 import numpy as np
 
@@ -166,6 +166,7 @@ def test_render_function_instrument(sapf_bin, render):
     assert np.abs(sec(.51, .74)).max() == pytest.approx(.1, abs=.005)
 
 
+@pytest.mark.timing
 def test_play_function_instrument_loads_its_defs_first(sapf_bin, tmp_path, recorder):
     news = live(recorder, tmp_path, f"{{:instrument {TONE_FN} :midinote [60 64] cyc :dur .25}} pbind play\n", 1)
     assert len(recorder.defs) == 2
@@ -251,9 +252,11 @@ class Recorder:
     def __init__(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind(("127.0.0.1", 0))
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4 << 20)  # a play's 30 wave tables are 1.2 MB
         self.sock.settimeout(.1)
         self.port = self.sock.getsockname()[1]
         self.bundles, self.plain, self.defs, self.done = [], [], [], False
+        self.client = None  # the address that sent /notify
         self.thread = threading.Thread(target=self.serve, daemon=True)
         self.thread.start()
 
@@ -269,9 +272,15 @@ class Recorder:
             elif (msg := OscMessage.from_datagram(data)).address == "/sync":
                 self.sock.sendto(OscMessage("/synced", 7301).to_datagram(), addr)
             else:
+                if msg.address == "/notify":
+                    self.client = addr
                 self.plain.append((msg.address, list(msg.contents)))
                 if msg.address == "/d_recv":
                     self.defs += scgf_blobs(data)
+
+    def end(self, node):
+        """Reports that node ended, as scsynth tells a client registered with /notify."""
+        self.sock.sendto(OscMessage("/n_end", node, 0, -1, -1, 0).to_datagram(), self.client)
 
     def news(self):
         return [(arrived, t, dict(zip(c[4::2], c[5::2]))) for arrived, t, a, c in self.bundles if a == "/s_new"]
@@ -322,12 +331,14 @@ def test_play_sends_each_event_ahead_of_its_time(sapf_bin, tmp_path, recorder):
     assert all(0 < t - arrived < .3 for arrived, t, _ in news)
 
 
+@pytest.mark.timing
 def test_clock_tempo(sapf_bin, tmp_path, recorder):
     news = live(recorder, tmp_path, PING + "4 clock.new = c\n{:instrument 'ping :dur 1} pbind c.play\n", 1.1)
     assert 4 <= len(news) <= 6
     assert gaps([t for _, t, _ in news]) == pytest.approx([.25] * (len(news) - 1), abs=1e-3)
 
 
+@pytest.mark.timing
 def test_clock_set_tempo_while_playing(sapf_bin, tmp_path, recorder):
     """Releases are timed in beats, so they follow the tempo too."""
     news = live(recorder, tmp_path, PING + "2 clock.new = c\n{:instrument 'ping :dur 1} pbind c.play\n",
@@ -504,3 +515,30 @@ def test_play_pushes_a_node(sapf_bin, tmp_path, recorder, monkeypatch):
     assert out.split(f"Node {node}\n")[1].startswith("0\n")
     time.sleep(.1)
     assert ("/n_free", [node]) in recorder.plain
+
+
+# scsynth holds 1024 defs; a long session must free the defs of plays, ndefs and function instruments
+
+def freed(recorder):
+    """Def names a /d_free reached, plain, in a bundle, or in a /d_recv's completion message."""
+    names = {c[0] for a, c in recorder.plain if a == "/d_free"}
+    names |= {c[0] for _, _, a, c in recorder.bundles if a == "/d_free"}
+    for a, c in recorder.plain:
+        if a == "/d_recv" and len(c) > 1 and isinstance(c[1], OscBundle):
+            names |= {m.contents[0] for m in c[1].contents if m.address == "/d_free"}
+    return names
+
+
+@pytest.mark.parametrize("code, wait, count", [
+    ("[440 0 sinosc .1 *] play\n[550 0 sinosc .1 *] play\n", .3, 2),
+    ("[440 0 sinosc .1 *] 'd ndef pop\n[550 0 sinosc .1 *] 'd ndef pop\n", .5, 2),
+    (f"{{:instrument {TONE_FN} :midinote [60 62 64] cyc :dur .05}} pbind play\n", .6, 3),
+    # past the 64 a stream keeps, each new graph's def goes with its event
+    (f"{{:instrument {TONE_FN} :midinote 20 119 to :dur .01}} pbind play\n", 1.6, 100),
+], ids=["play", "ndef", "events", "events-uncached"])
+def test_defs_are_freed(code, wait, count, sapf_bin, tmp_path, recorder):
+    live(recorder, tmp_path, code, wait)
+    time.sleep(.3)  # the stream's frees follow its last bundle
+    names = {decode_scgf(d)["name"] for d in recorder.defs} - {"sapf-ndef-d-monitor"}
+    assert len(names) == count, names
+    assert names - freed(recorder) == set()

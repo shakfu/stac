@@ -108,4 +108,4 @@ add_test(
     COMMAND $<TARGET_FILE:stac> -q ${CMAKE_SOURCE_DIR}/unit-tests.txt
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )
-set_tests_properties(unit_tests_txt PROPERTIES PASS_REGULAR_EXPRESSION "Passed" ENVIRONMENT "STAC_PRELUDE=/dev/null")
+set_tests_properties(unit_tests_txt PROPERTIES PASS_REGULAR_EXPRESSION "Passed" FAIL_REGULAR_EXPRESSION "FAILED;error:" ENVIRONMENT "STAC_PRELUDE=/dev/null")

@@ -61,3 +61,10 @@ build-clang/
 __pycache__/
 .pytest_cache/
 .DS_Store
+
+# agents
+.claude
+CLAUDE.md
+AGENTS.md
+REVIEW.md
+

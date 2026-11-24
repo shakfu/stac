@@ -12,6 +12,7 @@
 #define SAPF_SCSYNTH_HPP
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -27,6 +28,22 @@ std::string oscMessage(const std::string& address, const std::vector<OscArg>& ar
 // A bundle of messages at `seconds`: NTP time for a realtime server, time from the score's start
 // for NRT.
 std::string oscBundle(double seconds, const std::vector<std::string>& messages, bool realtime);
+
+// A bundle that runs, in order, as it arrives: OSC's time tag 1.
+std::string oscImmediate(const std::vector<std::string>& messages);
+
+// Removes a def's name; scsynth keeps the def until the synths using it end.
+std::string defFree(const std::string& name);
+
+// Keeps `holds`, the buffer slots synth `node` reads, until the server reports its /n_end. Call
+// before starting the synth. A server that sends no notifications leaves them held.
+void holdWhilePlaying(int node, std::vector<std::shared_ptr<void>> holds);
+// From a server's notifications: the node's holds are released.
+void scsynthNodeEnded(int node);
+// The World stopped, ending every synth.
+void scsynthAllNodesEnded();
+// The node an /n_end reports, or -1 for any other message.
+int oscNodeEnded(const std::string& reply);
 
 // A server that takes OSC packets in this process. The executable registers one; the interpreter
 // library has none, so an SSP plugin can supply its own.

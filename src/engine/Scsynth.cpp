@@ -12,6 +12,10 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <thread>
 
 #ifndef _WIN32
 #include <netdb.h>
@@ -106,6 +110,10 @@ std::string oscBundle(double seconds, const std::vector<std::string>& messages, 
 	return out;
 }
 
+std::string oscImmediate(const std::vector<std::string>& messages) { return oscBundle(1. / 4294967296., messages, false); }
+
+std::string defFree(const std::string& name) { return oscMessage("/d_free", {{OscArg::String, 0, name}}); }
+
 namespace {
 ScsynthServer* gEmbedded = nullptr;
 
@@ -144,6 +152,48 @@ std::string scsynthAddress()
 	return host + ":" + port;
 }
 
+namespace {
+std::mutex gHoldMutex;
+std::map<int, std::vector<std::shared_ptr<void>>> gHolds;  // by node, until its /n_end
+void watchUdpNodes();
+} // namespace
+
+void holdWhilePlaying(int node, std::vector<std::shared_ptr<void>> holds)
+{
+	if (holds.empty()) return;
+	if (!embedded()) watchUdpNodes();
+	std::lock_guard<std::mutex> lock(gHoldMutex);
+	auto& h = gHolds[node];
+	h.insert(h.end(), std::make_move_iterator(holds.begin()), std::make_move_iterator(holds.end()));
+}
+
+void scsynthNodeEnded(int node)
+{
+	std::vector<std::shared_ptr<void>> released;  // freed after the lock: a slot may free its table
+	std::lock_guard<std::mutex> lock(gHoldMutex);
+	auto it = gHolds.find(node);
+	if (it == gHolds.end()) return;
+	released.swap(it->second);
+	gHolds.erase(it);
+}
+
+void scsynthAllNodesEnded()
+{
+	std::map<int, std::vector<std::shared_ptr<void>>> released;
+	std::lock_guard<std::mutex> lock(gHoldMutex);
+	released.swap(gHolds);
+}
+
+int oscNodeEnded(const std::string& reply)
+{
+	size_t pos = 0;
+	if (getString(reply, pos) != "/n_end") return -1;
+	std::string tags = getString(reply, pos);
+	if (tags.size() < 2 || tags[1] != 'i' || pos + 4 > reply.size()) return -1;
+	const auto* b = (const unsigned char*)reply.data() + pos;
+	return (int)((uint32_t)b[0] << 24 | (uint32_t)b[1] << 16 | (uint32_t)b[2] << 8 | b[3]);
+}
+
 #ifdef _WIN32
 
 std::string scsynthSendSync(const std::vector<std::string>& packets, int timeoutMs)
@@ -155,6 +205,10 @@ void scsynthSend(const std::string& packet)
 {
 	if (ScsynthServer* s = embedded()) s->send(packet);
 }
+
+namespace {
+void watchUdpNodes() {}
+} // namespace
 
 #else
 
@@ -179,6 +233,9 @@ struct Socket {
 		}
 		fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 		if (fd < 0 || connect(fd, res->ai_addr, res->ai_addrlen) != 0) error = "cannot open a UDP socket";
+		// macOS caps a datagram at the send buffer, 9216 bytes by default; a wave table's /b_alloc is 41 KB
+		int size = 65536;
+		if (fd >= 0) setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &size, sizeof(size));
 		freeaddrinfo(res);
 	}
 	~Socket() { if (fd >= 0) close(fd); }
@@ -225,5 +282,33 @@ void scsynthSend(const std::string& packet)
 	Socket sock;
 	if (sock.error.empty()) sock.send(packet);
 }
+
+namespace {
+
+// One socket registered with /notify, whose thread passes each /n_end to the holds. Its
+// registration ends with the server; holds of a restarted server's synths are kept for good.
+void watchUdpNodes()
+{
+	static std::once_flag once;
+	std::call_once(once, [] {
+		auto sock = std::make_shared<Socket>();
+		if (!sock->error.empty()) return;
+		sock->send(oscMessage("/notify", {{OscArg::Int, 1, ""}}));
+		std::thread([sock] {
+			char buf[1024];
+			for (;;) {
+				ssize_t n = recv(sock->fd, buf, sizeof(buf), 0);
+				if (n <= 0) {  // e.g. ECONNREFUSED while the server is down
+					std::this_thread::sleep_for(std::chrono::milliseconds(100));
+					continue;
+				}
+				int node = oscNodeEnded(std::string(buf, (size_t)n));
+				if (node >= 0) scsynthNodeEnded(node);
+			}
+		}).detach();
+	});
+}
+
+} // namespace
 
 #endif

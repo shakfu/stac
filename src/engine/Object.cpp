@@ -218,29 +218,18 @@ public:
 		: th(inThread), fun(th.fun),
 		stackBase(th.stackBase), localBase(th.localBase)
 	{
+		// The stack grows down. A std::thread has 512 KB on macOS, so deep recursion would crash.
+		char here;
+		if (th.mCallDepth == 0) th.mStackTop = &here;
+		else if (th.mStackTop - &here > kMaxCallStack) {
+			post("recursion too deep\n");
+			throw errStackOverflow;
+		}
+		++th.mCallDepth;
 	}
 	~PushFunContext()
 	{
-		th.popLocals();
-		th.fun = fun;
-		th.setStackBaseTo(stackBase);
-		th.setLocalBase(localBase);
-	}
-};
-
-class PushREPLFunContext
-{
-	Thread& th;
-	P<Fun> fun;
-	size_t stackBase, localBase;
-public:
-	PushREPLFunContext(Thread& inThread, P<Fun> const& inFun)
-		: th(inThread), fun(th.fun),
-		stackBase(th.stackBase), localBase(th.localBase)
-	{
-	}
-	~PushREPLFunContext()
-	{
+		--th.mCallDepth;
 		th.popLocals();
 		th.fun = fun;
 		th.setStackBaseTo(stackBase);
@@ -255,7 +244,7 @@ void Fun::runREPL(Thread& th)
 		throw errStackUnderflow;
 	}
 
-	PushREPLFunContext pfc(th, this);
+	PushFunContext pfc(th, this);
 
 	th.setLocalBase();
 

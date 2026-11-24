@@ -111,7 +111,9 @@ Thread::~Thread() {}
 void Thread::flushBacktrace()
 {
 	if (!mBacktrace.empty()) post("%s", mBacktrace.c_str());
-	mBacktrace.clear();
+	if (mBacktraceFrames > kMaxBacktraceFrames)
+		post("backtrace: %d more frames\n", mBacktraceFrames - kMaxBacktraceFrames);
+	clearBacktrace();
 }
 
 V Thread::lookupTop(Fun* f, Arg key)
@@ -660,25 +662,31 @@ bool loadFile(Thread& th, const char* filename)
 				return true;
 			}
 		}
-    } catch (V& v) {
-		th.flushBacktrace();
-        post("error: ");
-        v.print(th);
-        post("\n");
-	} catch (int err) {
-		th.flushBacktrace();
-		if (err <= -1000 && err > -1000 - kNumErrors) {
-			post("error: %s\n", errString[-1000 - err]);
-		} else {
-			post("error: %d\n", err);
-		}
-	} catch (std::bad_alloc& xerr) {
-		post("not enough memory\n");
 	} catch (...) {
-		th.flushBacktrace();
-		post("unknown error\n");
+		postError(th, nullptr);
 	}
 	return false;
+}
+
+void postError(Thread& th, const char* who)
+{
+	th.flushBacktrace();
+	const char* sep = who ? " : " : "";
+	if (!who) who = "";
+	try {
+		throw;
+	} catch (V& v) {
+		post("%s%serror: ", who, sep);
+		v.print(th);
+		post("\n");
+	} catch (int err) {
+		if (err <= -1000 && err > -1000 - kNumErrors) post("%s%serror: %s\n", who, sep, errString[-1000 - err]);
+		else post("%s%serror: %d\n", who, sep, err);
+	} catch (std::bad_alloc&) {
+		post("%s%snot enough memory\n", who, sep);
+	} catch (...) {
+		post("%s%sunknown error\n", who, sep);
+	}
 }
 
 void Thread::printStack()
@@ -891,13 +899,7 @@ double Thread::popFloat(const char* msg)
 
 void Thread::tuck(size_t n, Arg v)
 {
-	stack.push_back(V(0.));
-	V* sp = &stack.back();
-	
-	for (size_t i = 0; i < n; ++i)
-		sp[-i] = sp[-i-1];
-	
-	sp[-n] = v;
+	stack.insert(stack.end() - n, v);
 }
 
 ///////////////////////////////////////

@@ -21,4 +21,8 @@ void playEventStream(Thread& th, Arg stream);
 // Ends every player and forgets every ndef's synth, as stop does.
 void stopEventStreams();
 
+// Ends event streams and ola schedulers and waits up to `seconds` for their threads to return.
+// Call before exit: static destructors free tables the threads read. False if one still runs.
+bool stopPlayers(double seconds);
+
 #endif

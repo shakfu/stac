@@ -1,6 +1,7 @@
 #include "sapf/Engine.hpp"
 #include "sapf/ReplRunner.hpp"
 #include "VM.hpp"
+#include "Patterns.hpp"
 #include "CLI11.hpp"
 #include <cstdio>
 #ifdef SAPF_EMBED_SCSYNTH
@@ -64,6 +65,7 @@ int main(int argc, const char * argv[])
 #ifdef SAPF_EMBED_SCSYNTH
 			waitForEmbeddedScsynth();  // what the file plays, until it ends
 #endif
+			stopPlayers(2.);
 			return 0;
 		}
 	}

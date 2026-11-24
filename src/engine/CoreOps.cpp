@@ -793,7 +793,7 @@ static void try_(Thread& th, Prim* prim)
 	try {
 		tryCode.apply(th);
 	} catch (...) {
-		th.mBacktrace.clear();  // caught: nothing to report
+		th.clearBacktrace();  // caught: nothing to report
 		catchCode.apply(th);
 	}
 }
@@ -1005,7 +1005,11 @@ static void Y_(Thread& th, Prim* prim)
 static void* gofun(void* ptr)
 {
     Thread* th = (Thread*)ptr;
-    th->fun->run(*th);
+    try {
+        th->fun->run(*th);
+    } catch (...) {  // an exception leaving a std::thread calls std::terminate
+        postError(*th, "go");
+    }
     delete th;
     return NULL;
 }

@@ -11,3 +11,4 @@ dev = ["pytest", "nanosynth[numpy]>=0.4.1"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/py"]
+markers = ["timing: wall-clock assertions, deselected under sanitizers"]

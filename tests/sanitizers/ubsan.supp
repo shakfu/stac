@@ -1,0 +1,16 @@
+# Upstream sapf's hashes and RNG wrap signed integers on purpose. Unsigned arithmetic would change
+# right-shift results, and so symbol hashes and seeded random output.
+signed-integer-overflow:Hash
+shift-base:Hash
+signed-integer-overflow:Hash64
+shift-base:Hash64
+signed-integer-overflow:RGen::*
+signed-integer-overflow:timeseed
+# replxx combines ReplxxColor values as bit flags.
+enum:highlighterCallback
+enum:parseSgr
+enum:replxx.cxx
+enum:*ReplxxColor*
+# scsynth and its UGens
+signed-integer-overflow:supercollider-src/*
+shift-base:supercollider-src/*

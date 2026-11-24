@@ -6028,7 +6028,7 @@ Use it for a server command stac has no word for.
 
 `buffer.read (path --> buffer)`
 
-Reads a WAV or AIFF file into one of the sound-file buffers, 0 to 63, as SC's `Buffer.read`, and pushes the buffer.
+Reads a WAV or AIFF file into one of the sound-file buffers, 0 to 63, as SC's `Buffer.read`, and pushes the buffer. `sf>` and `playbuf` share the buffer of a file they read; `.free` frees it once none still reads it.
 
 Use it to play a sample with `playbuf` or `bufrd`.
 

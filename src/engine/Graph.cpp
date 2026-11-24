@@ -117,7 +117,7 @@ V makeParam(const char* name, double value, int kind, int order)
 	return new Sig(node, 0);
 }
 
-std::vector<P<UGenNode>>* gDefRoots = nullptr;
+thread_local std::vector<P<UGenNode>>* gDefRoots = nullptr;
 
 ////////////////////////////////////////////////////////////////////////////////
 // operators
@@ -422,6 +422,7 @@ struct WorkGraph {
 		c->wavetable = u->wavetable;
 		c->tableBuf = u->tableBuf;
 		c->sample = u->sample;
+		c->slot = u->slot;
 		c->spec = u->spec;
 		memo[u] = c;
 		// A generated UGen's kr method takes its inputs as given; its ar method raised some.
@@ -618,6 +619,14 @@ static std::vector<UGenNode*> nodesOf(Thread& th, Arg channels, P<Object> UGenNo
 
 std::vector<UGenNode*> wavetableNodesOf(Thread& th, Arg channels) { return nodesOf(th, channels, &UGenNode::wavetable); }
 std::vector<UGenNode*> sampleNodesOf(Thread& th, Arg channels) { return nodesOf(th, channels, &UGenNode::sample); }
+
+std::vector<std::shared_ptr<void>> slotsOf(Thread& th, Arg channels)
+{
+	std::vector<std::shared_ptr<void>> out;
+	for (UGenNode* u : graphNodes(th, channels))
+		if (u->slot) out.push_back(u->slot);
+	return out;
+}
 
 std::string compileSynthDef(Thread& th, Arg channels, const std::string& name, int outBus)
 {

@@ -13,6 +13,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <mutex>
 #include <sstream>
 
@@ -35,25 +36,31 @@ public:
 	virtual const char* TypeName() const override { return "SampleFile"; }
 };
 
-std::mutex gMutex;
-std::vector<std::string> gBufs;  // the absolute path in each buffer, from 0
+// A sound file's buffer. Taken while a graph or Buffer that reads it exists or a synth plays it.
+struct SampleSlot {
+	std::string absolute;
+	int buf;
+};
 
-int bufferFor(const std::string& absolute)
+std::mutex gMutex;
+std::vector<std::weak_ptr<SampleSlot>> gSlots(kSampleBufs);
+
+std::shared_ptr<SampleSlot> slotFor(const std::string& absolute)
 {
 	std::lock_guard<std::mutex> lock(gMutex);
-	for (size_t i = 0; i < gBufs.size(); ++i)
-		if (gBufs[i] == absolute) return (int)i;
-	for (size_t i = 0; i < gBufs.size(); ++i)
-		if (gBufs[i].empty()) {
-			gBufs[i] = absolute;
-			return (int)i;
-		}
-	if ((int)gBufs.size() == kSampleBufs) {
-		post("sf> : more than %d sound files\n", kSampleBufs);
+	int empty = -1;
+	for (int i = 0; i < kSampleBufs; ++i) {
+		std::shared_ptr<SampleSlot> s = gSlots[i].lock();
+		if (s && s->absolute == absolute) return s;
+		if (!s && empty < 0) empty = i;
+	}
+	if (empty < 0) {
+		post("sf> : more than %d sound files in use\n", kSampleBufs);
 		throw errOutOfRange;
 	}
-	gBufs.push_back(absolute);
-	return (int)gBufs.size() - 1;
+	auto s = std::make_shared<SampleSlot>(SampleSlot{absolute, empty});
+	gSlots[empty] = s;
+	return s;
 }
 
 uint32_t le32(const char* p) { return (uint8_t)p[0] | (uint8_t)p[1] << 8 | (uint8_t)p[2] << 16 | (uint32_t)(uint8_t)p[3] << 24; }
@@ -111,11 +118,13 @@ P<SampleFile> openSample(Thread& th, Arg name, const char* msg)
 // PlayBuf's channels from buffer `buf`, as a list as sapf's sf> gives.
 V playBuf(Thread& th, P<SampleFile> const& file, Arg rate, double loop, double doneAction)
 {
-	int buf = bufferFor(file->absolute);
+	std::shared_ptr<SampleSlot> slot = slotFor(file->absolute);
+	int buf = slot->buf;
 	V out = makeUGen("PlayBuf", rateAR, {(double)buf, rate, 1., 0., loop, doneAction}, file->channels, 0, false);
 	UGenNode* node = isSig(out) ? ((Sig*)out.o())->node() : ((Sig*)((List*)out.o())->at(0).o())->node();
 	node->sample = file;
 	node->tableBuf = buf;
+	node->slot = slot;
 	if (isSig(out)) {
 		P<List> list = new List(itemTypeV, 1);
 		list->add(out);
@@ -134,16 +143,19 @@ V endEach(Thread& th, Arg channels, Arg frames)
 
 } // namespace
 
-void releaseSampleBuffer(int buf)
+bool releaseSampleSlot(std::shared_ptr<void>& slot)
 {
 	std::lock_guard<std::mutex> lock(gMutex);
-	if (buf >= 0 && buf < (int)gBufs.size()) gBufs[buf].clear();
+	std::weak_ptr<void> held = slot;
+	slot.reset();
+	return held.expired();
 }
 
 SampleInfo sampleBuffer(Thread& th, Arg path, const char* msg)
 {
 	P<SampleFile> file = openSample(th, path, msg);
-	return {bufferFor(file->absolute), file->channels, file->frames, file->absolute};
+	std::shared_ptr<SampleSlot> slot = slotFor(file->absolute);
+	return {slot->buf, file->channels, file->frames, file->absolute, slot};
 }
 
 std::vector<std::string> loadSamples(Thread& th, Arg channels, LoadedTables& loaded, bool absolute)
