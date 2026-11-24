@@ -14,3 +14,5 @@ enum:*ReplxxColor*
 # scsynth and its UGens
 signed-integer-overflow:supercollider-src/*
 shift-base:supercollider-src/*
+# scsynth calls node and UGen calc functions through a generic function-pointer type.
+function:supercollider-src/*

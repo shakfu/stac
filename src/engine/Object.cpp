@@ -24,6 +24,9 @@
 #include <cstdarg>
 #include <functional>
 #include <string>
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
 
 static std::function<void(const char*)> gPostHandler;
 
@@ -219,9 +222,14 @@ public:
 		stackBase(th.stackBase), localBase(th.localBase)
 	{
 		// The stack grows down. A std::thread has 512 KB on macOS, so deep recursion would crash.
-		char here;
-		if (th.mCallDepth == 0) th.mStackTop = &here;
-		else if (th.mStackTop - &here > kMaxCallStack) {
+		// The frame address, not a local's: ASan's use-after-return check moves locals to the heap.
+#ifdef _MSC_VER
+		char* here = (char*)_AddressOfReturnAddress();
+#else
+		char* here = (char*)__builtin_frame_address(0);
+#endif
+		if (th.mCallDepth == 0) th.mStackTop = here;
+		else if (th.mStackTop - here > kMaxCallStack) {
 			post("recursion too deep\n");
 			throw errStackOverflow;
 		}
